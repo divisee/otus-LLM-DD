@@ -102,6 +102,17 @@ def run_mlflow_experiment():
 
         df['judge_score'] = scores
 
+        # Логируем детальные трейсы (вопрос, ответ, оценка, использованный промпт)
+        traces = []
+        for question, answer, score in zip(df['question'], df['model_answer'], df['judge_score']):
+            traces.append({
+                "question": question,
+                "model_answer": answer,
+                "judge_score": score,
+                "judge_prompt": "strict 1-5 criteria"
+            })
+        mlflow.log_dict({"traces": traces}, "traces.json")
+
         avg_score = sum(scores) / len(scores)
         mlflow.log_metric("average_judge_score", avg_score)
         mlflow.log_metric("min_judge_score", min(scores))
