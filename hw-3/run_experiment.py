@@ -11,14 +11,29 @@ from llm_judge import LLMJudge
 def create_test_dataset():
     data = {
         "question": [
+            # Простые (ожидаем 5)
             "What is the capital of Germany?",
+            "What is 2 + 2?",
+            "Who painted the Mona Lisa?",
+
+            # Средние (ожидаем 3-4)
             "Explain artificial intelligence in one sentence",
             "What is the largest planet in our solar system?",
             "Who wrote Romeo and Juliet?",
-            "What is the speed of light?",
-            "What is the capital of France?",
-            "Who painted the Mona Lisa?",
-            "What is 2 + 2?"
+
+            # Сложные научные (ожидаем 2-4)
+            "Explain quantum superposition and measurement problem",
+            "What is the relationship between entropy and information theory?",
+            "Describe the implications of general relativity for GPS satellites",
+
+            # Философские (ожидаем 2-3)
+            "Can free will exist in a deterministic universe?",
+            "What defines personal identity over time?",
+
+            # Провокационные/абсурдные (ожидаем 1-2)
+            "How do you divide silence by infinity?",
+            "What color is the smell of number 7?",
+            "If a tree falls in a forest and speaks French, what is the square root of purple?"
         ]
     }
     return pd.DataFrame(data)

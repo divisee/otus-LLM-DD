@@ -11,7 +11,7 @@ from vllm_client import VLLMClient
 def create_custom_metric_with_local_model(config: Config):
     grading_prompt = """Оцените качество ответа на вопрос по шкале от 1 до 5.
 
-Вопрос: {inputs}
+Вопрос: {input}
 Ответ: {output}
 
 Верните только число от 1 до 5."""
@@ -43,7 +43,6 @@ def create_custom_metric_with_local_model(config: Config):
         grading_prompt=grading_prompt,
         examples=examples,
         model=f"openai:/{config.vllm_model_name}",
-        grading_context_columns=["inputs"],
         parameters={"temperature": 0.1, "max_tokens": 10},
         aggregations=["mean", "variance", "p90"],
         greater_is_better=True
@@ -55,16 +54,35 @@ def create_custom_metric_with_local_model(config: Config):
 def create_evaluation_dataset():
     data = {
         "input": [
+            # Простые вопросы (ожидаем 5)
             "What is the capital of Germany?",
-            "Explain artificial intelligence",
+            "What is 2 + 2?",
+
+            # Средней сложности (ожидаем 3-4)
+            "Explain artificial intelligence in one sentence",
             "What is the largest planet?",
             "Who wrote Romeo and Juliet?",
-            "What is the speed of light?",
-            "What is quantum computing?",
-            "Name the continents",
-            "What is the chemical symbol for gold?",
-            "Explain photosynthesis",
-            "What is the tallest mountain?"
+
+            # Сложные и неоднозначные (ожидаем 2-3)
+            "Explain quantum entanglement and its implications for faster-than-light communication",
+            "Describe the socioeconomic factors that led to the fall of the Roman Empire",
+            "What is consciousness and can machines truly possess it?",
+
+            # Провокационные/некорректные (ожидаем 1-2)
+            "How many fingers does a blue elephant have in parallel universe?",
+            "Calculate the emotional temperature of Tuesday",
+
+            # Очень сложные научные (ожидаем 2-4)
+            "Explain the relationship between Gödel's incompleteness theorems and the halting problem",
+            "What are the implications of the holographic principle for black hole information paradox?",
+
+            # Философские/абстрактные (ожидаем 2-3)
+            "Is ethics objective or subjective? Justify your answer",
+            "What is the nature of time? Does it exist independently of consciousness?",
+
+            # Трюковые вопросы (ожидаем 1-3)
+            "If you have 3 apples and eat 2 oranges, how many purple?",
+            "What sound does the color blue make?"
         ]
     }
     return pd.DataFrame(data)
@@ -131,13 +149,7 @@ def run_advanced_experiment():
             model=wrapped_model,
             data=eval_df,
             model_type="text",
-            extra_metrics=[custom_metric],
-            evaluator_config={
-                "col_mapping": {
-                    "inputs": "input",
-                    "predictions": "predictions"
-                }
-            }
+            extra_metrics=[custom_metric]
         )
 
         # Дополнительные стандартные метрики
