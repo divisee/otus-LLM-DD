@@ -7,6 +7,7 @@ import pandas as pd
 from config_loader import Config
 from vllm_client import VLLMClient
 from llm_judge import LLMJudge
+import json
 
 
 def _resolve_tracking_uri(raw_uri: str) -> str:
@@ -61,6 +62,15 @@ def generate_answers(client: VLLMClient, questions: list) -> list:
     return answers
 
 
+def _get_or_create_experiment(name: str) -> str:
+    exp = mlflow.get_experiment_by_name(name)
+    if exp is not None:
+        return exp.experiment_id
+
+    artifact_root = (Path(__file__).parent / "mlartifacts").resolve().as_uri()
+    return mlflow.create_experiment(name, artifact_location=artifact_root)
+
+
 def run_mlflow_experiment():
     print("=" * 80)
     print("Запуск MLflow эксперимента с LLM-as-a-Judge")
@@ -73,7 +83,8 @@ def run_mlflow_experiment():
     llm_judge = LLMJudge(config, vllm_client)
 
     mlflow.set_tracking_uri(tracking_uri)
-    mlflow.set_experiment(config.mlflow_experiment_name)
+    exp_id = _get_or_create_experiment(config.mlflow_experiment_name)
+    mlflow.set_experiment(experiment_id=exp_id)
 
     df = create_test_dataset()
     print(f"\nСоздан тестовый датасет с {len(df)} вопросами\n")
@@ -102,16 +113,20 @@ def run_mlflow_experiment():
 
         df['judge_score'] = scores
 
-        # Логируем детальные трейсы (вопрос, ответ, оценка, использованный промпт)
+        # Логируем детальные трейсы (вопрос, ответ, оценка) как артефакт-файл
         traces = []
         for question, answer, score in zip(df['question'], df['model_answer'], df['judge_score']):
             traces.append({
-                "question": question,
-                "model_answer": answer,
-                "judge_score": score,
+                "question": str(question),
+                "model_answer": str(answer),
+                "judge_score": int(score) if score is not None else None,
                 "judge_prompt": "strict 1-5 criteria"
             })
-        mlflow.log_dict({"traces": traces}, "traces.json")
+
+        traces_path = Path("traces.json")
+        traces_path.write_text(json.dumps({"traces": traces}, ensure_ascii=False, indent=2), encoding="utf-8")
+        mlflow.log_artifact(str(traces_path))
+        mlflow.set_tag("has_traces", "true")
 
         avg_score = sum(scores) / len(scores)
         mlflow.log_metric("average_judge_score", avg_score)
