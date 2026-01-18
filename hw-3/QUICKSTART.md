@@ -41,6 +41,12 @@ make test
 make experiment
 ```
 
+### 4.1 Эксперимент с make_genai_metric
+
+```bash
+make genai
+```
+
 ### 5. Просмотрите результаты в MLflow
 
 **ВАЖНО!** Запускайте MLflow UI из папки hw-3:
@@ -71,6 +77,7 @@ make install    # Установить зависимости
 make check      # Проверить vLLM сервер
 make test       # Тестировать API (requests/httpx/openai)
 make experiment # Запустить эксперимент
+make genai      # Эксперимент с make_genai_metric
 make mlflow     # Запустить MLflow UI
 make clean      # Очистить временные файлы
 ```

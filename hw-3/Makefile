@@ -1,4 +1,4 @@
-.PHONY: help install check test experiment mlflow clean
+.PHONY: help install check test experiment genai mlflow clean
 
 help:
 	@echo "Доступные команды:"
@@ -6,6 +6,7 @@ help:
 	@echo "  make check      - Проверить подключение к vLLM"
 	@echo "  make test       - Тестировать API (requests/httpx/openai)"
 	@echo "  make experiment - Запустить эксперимент"
+	@echo "  make genai      - Эксперимент с make_genai_metric"
 	@echo "  make mlflow     - Запустить MLflow UI"
 	@echo "  make clean      - Очистить временные файлы"
 
@@ -25,6 +26,10 @@ test:
 experiment:
 	@echo "Запуск эксперимента..."
 	python run_experiment.py
+
+genai:
+	@echo "Запуск эксперимента с make_genai_metric..."
+	python run_genai_metric_experiment.py
 
 mlflow:
 	@echo "Запуск MLflow UI на http://localhost:5000"
