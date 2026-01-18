@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 
-
+import os
+from pathlib import Path
 import mlflow
 import pandas as pd
 from mlflow.metrics.genai import EvaluationExample, make_genai_metric
 from config_loader import Config
 from vllm_client import VLLMClient
+
+
+def _resolve_tracking_uri(raw_uri: str) -> str:
+    if raw_uri.startswith("sqlite:///"):
+        path = raw_uri.replace("sqlite:///", "", 1)
+        if not os.path.isabs(path):
+            abs_path = Path(__file__).parent.joinpath(path).resolve()
+            return f"sqlite:///{abs_path}"
+    return raw_uri
 
 
 def create_custom_metric_with_local_model(config: Config):
@@ -159,9 +169,10 @@ def run_advanced_experiment():
     print("=" * 80)
 
     config = Config()
+    tracking_uri = _resolve_tracking_uri(config.mlflow_tracking_uri)
     vllm_client = VLLMClient(config)
 
-    mlflow.set_tracking_uri(config.mlflow_tracking_uri)
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(config.mlflow_experiment_name)
 
     eval_df = create_evaluation_dataset()
@@ -186,7 +197,12 @@ def run_advanced_experiment():
             model=wrapped_model,
             data=eval_df,
             model_type="text",
-            extra_metrics=[custom_metric]
+            extra_metrics=[custom_metric],
+            evaluator_config={
+                "col_mapping": {
+                    "inputs": "input"
+                }
+            }
         )
 
         # Дополнительные стандартные метрики

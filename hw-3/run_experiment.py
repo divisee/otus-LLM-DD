@@ -1,11 +1,21 @@
 #!/usr/bin/env python3
 
-
+import os
+from pathlib import Path
 import mlflow
 import pandas as pd
 from config_loader import Config
 from vllm_client import VLLMClient
 from llm_judge import LLMJudge
+
+
+def _resolve_tracking_uri(raw_uri: str) -> str:
+    if raw_uri.startswith("sqlite:///"):
+        path = raw_uri.replace("sqlite:///", "", 1)
+        if not os.path.isabs(path):
+            abs_path = Path(__file__).parent.joinpath(path).resolve()
+            return f"sqlite:///{abs_path}"
+    return raw_uri
 
 
 def create_test_dataset():
@@ -57,10 +67,11 @@ def run_mlflow_experiment():
     print("=" * 80)
 
     config = Config()
+    tracking_uri = _resolve_tracking_uri(config.mlflow_tracking_uri)
     vllm_client = VLLMClient(config)
     llm_judge = LLMJudge(config, vllm_client)
 
-    mlflow.set_tracking_uri(config.mlflow_tracking_uri)
+    mlflow.set_tracking_uri(tracking_uri)
     mlflow.set_experiment(config.mlflow_experiment_name)
 
     df = create_test_dataset()
@@ -150,6 +161,6 @@ if __name__ == "__main__":
 
     print("\n" + "=" * 80)
     print("Для просмотра результатов в MLflow UI выполните:")
-    print("mlflow ui --port 5000")
+    print("mlflow ui --backend-store-uri sqlite:///mlflow.db --port 5000")
     print("Затем откройте http://localhost:5000 в браузере")
     print("=" * 80)
