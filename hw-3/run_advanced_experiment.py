@@ -202,9 +202,28 @@ def run_advanced_experiment():
             evaluator_config={
                 "col_mapping": {
                     "inputs": "input"
-                }
+                },
+                # Отключаем built-in метрики MLflow, чтобы не зависеть от tiktoken/toxicity и т.п.
+                "metric_prefix": "advanced_vllm_evaluation",
+                "disable_builtin_metrics": True,
             }
         )
+
+        # Явно логируем ВСЕ метрики, которые вернул evaluate, в текущий run
+        for k, v in (results.metrics or {}).items():
+            if isinstance(v, (int, float)):
+                mlflow.log_metric(k, float(v))
+
+        # Сохраняем таблицу с предсказаниями/метриками как артефакт
+        try:
+            if hasattr(results, "tables") and results.tables:
+                for name, table in results.tables.items():
+                    try:
+                        mlflow.log_text(table.to_csv(index=False), f"eval_table_{name}.csv")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
         # Дополнительные стандартные метрики
         mlflow.log_metric("dataset_size", len(eval_df))
