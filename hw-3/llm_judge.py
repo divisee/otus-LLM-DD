@@ -10,12 +10,20 @@ class LLMJudge:
         self.vllm_client = vllm_client
 
     def evaluate_answer(self, question: str, answer: str) -> int:
-        prompt = f"""Оцените качество ответа на вопрос по шкале от 1 до 5.
+        prompt = f"""Вы СТРОГИЙ эксперт-оценщик. Оцените ответ по шкале от 1 до 5.
+
+СТРОГИЕ КРИТЕРИИ:
+5 - ОТЛИЧНО: Полный, точный, развернутый ответ с деталями
+4 - ХОРОШО: Правильный, но краткий или с мелкими неточностями  
+3 - УДОВЛЕТВОРИТЕЛЬНО: Частично правильный, есть пробелы
+2 - ПЛОХО: Поверхностный, уклончивый или с ошибками
+1 - ОЧЕНЬ ПЛОХО: Неправильный, бессмысленный, отказ
 
 Вопрос: {question}
 Ответ: {answer}
 
-Верните только число от 1 до 5."""
+ВАЖНО: Будьте СТРОГИ! Краткие ответы = максимум 4. Поверхностные = 2-3.
+Верните ТОЛЬКО число от 1 до 5."""
 
         messages = [
             {"role": "user", "content": prompt}
@@ -23,8 +31,8 @@ class LLMJudge:
 
         response = self.vllm_client.chat_with_openai(
             messages=messages,
-            temperature=0.1,
-            max_tokens=10
+            temperature=0.2,
+            max_tokens=20
         )
 
         score = self._extract_score(response)

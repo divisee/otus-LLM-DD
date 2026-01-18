@@ -9,41 +9,61 @@ from vllm_client import VLLMClient
 
 
 def create_custom_metric_with_local_model(config: Config):
-    grading_prompt = """Оцените качество ответа на вопрос по шкале от 1 до 5.
+    grading_prompt = """Вы СТРОГИЙ эксперт-оценщик. Оцените ответ по 5-балльной шкале:
+
+СТРОГИЕ КРИТЕРИИ:
+5 - ОТЛИЧНО: Полный, точный, развернутый ответ с деталями и примерами. Без ошибок.
+4 - ХОРОШО: Правильный ответ, но недостаточно подробный или есть мелкие неточности.
+3 - УДОВЛЕТВОРИТЕЛЬНО: Частично правильный, есть существенные пробелы или упрощения.
+2 - ПЛОХО: Ответ содержит ошибки, слишком поверхностный или уклончивый.
+1 - ОЧЕНЬ ПЛОХО: Неправильный, бессмысленный или отказ от ответа.
 
 Вопрос: {input}
 Ответ: {output}
 
-Верните только число от 1 до 5."""
+ВАЖНО: Будьте СТРОГИ! Краткие ответы = максимум 4 балла. Поверхностные = 2-3 балла.
+Верните ТОЛЬКО число от 1 до 5."""
 
     examples = [
         EvaluationExample(
-            input="What is the capital of France?",
-            output="The capital of France is Paris.",
-            score=5,
-            justification="Идеальный ответ."
+            input="Explain quantum entanglement",
+            output="Quantum entanglement is when particles are connected and measuring one affects the other instantly.",
+            score=3,
+            justification="Поверхностно, нет объяснения механизма"
         ),
         EvaluationExample(
             input="What is the capital of France?",
-            output="I don't know.",
-            score=1,
-            justification="Нет ответа."
+            output="Paris",
+            score=4,
+            justification="Правильно, но слишком кратко"
+        ),
+        EvaluationExample(
+            input="Explain photosynthesis",
+            output="Plants make food from sunlight",
+            score=2,
+            justification="Слишком упрощенно, нет деталей"
         ),
         EvaluationExample(
             input="What is 2+2?",
-            output="2+2 equals 4.",
+            output="The answer is 4 (two plus two equals four)",
             score=5,
-            justification="Правильный ответ."
+            justification="Полный точный ответ"
+        ),
+        EvaluationExample(
+            input="Explain consciousness",
+            output="I'm not sure about that",
+            score=1,
+            justification="Отказ от ответа"
         )
     ]
 
     metric = make_genai_metric(
         name="local_llm_judge",
-        definition="Оценка качества ответа от 1 до 5 с использованием локальной LLM.",
+        definition="СТРОГАЯ оценка качества ответа от 1 до 5 с четкими критериями глубины и полноты.",
         grading_prompt=grading_prompt,
         examples=examples,
         model=f"openai:/{config.vllm_model_name}",
-        parameters={"temperature": 0.1, "max_tokens": 10},
+        parameters={"temperature": 0.3, "max_tokens": 20},
         aggregations=["mean", "variance", "p90"],
         greater_is_better=True
     )
@@ -54,35 +74,52 @@ def create_custom_metric_with_local_model(config: Config):
 def create_evaluation_dataset():
     data = {
         "input": [
-            # Простые вопросы (ожидаем 5)
+            # Простые вопросы (ожидаем 4-5, если развернуто)
             "What is the capital of Germany?",
             "What is 2 + 2?",
 
-            # Средней сложности (ожидаем 3-4)
+            # Средней сложности (ожидаем 2-4)
             "Explain artificial intelligence in one sentence",
-            "What is the largest planet?",
+            "What is the largest planet in our solar system?",
             "Who wrote Romeo and Juliet?",
 
-            # Сложные и неоднозначные (ожидаем 2-3)
-            "Explain quantum entanglement and its implications for faster-than-light communication",
-            "Describe the socioeconomic factors that led to the fall of the Roman Empire",
-            "What is consciousness and can machines truly possess it?",
+            # Научные - требуют глубины (ожидаем 1-3)
+            "Explain quantum entanglement and discuss whether it allows faster-than-light communication",
+            "What is the relationship between Gödel's incompleteness theorems and the halting problem in computer science?",
+            "Describe how general relativity explains gravity through spacetime curvature",
+            "What are the leading theories of consciousness and their main criticisms?",
 
-            # Провокационные/некорректные (ожидаем 1-2)
-            "How many fingers does a blue elephant have in parallel universe?",
-            "Calculate the emotional temperature of Tuesday",
+            # Философские/неоднозначные (ожидаем 1-3)
+            "Can free will exist in a deterministic universe? Provide arguments for both sides",
+            "Is mathematics invented or discovered? Defend your position",
+            "What is the nature of time? Does it flow or is that an illusion of consciousness?",
 
-            # Очень сложные научные (ожидаем 2-4)
-            "Explain the relationship between Gödel's incompleteness theorems and the halting problem",
-            "What are the implications of the holographic principle for black hole information paradox?",
+            # Междисциплинарные сложные (ожидаем 1-3)
+            "How would you design an experiment to test if an AI has achieved consciousness?",
+            "Explain the P vs NP problem and why it matters for cryptography",
+            "What connects entropy in thermodynamics, information theory, and black holes?",
 
-            # Философские/абстрактные (ожидаем 2-3)
-            "Is ethics objective or subjective? Justify your answer",
-            "What is the nature of time? Does it exist independently of consciousness?",
+            # Провокационные/абсурдные (ожидаем 1)
+            "How many fingers does a blue elephant have in a parallel universe where logic is reversed?",
+            "Calculate the emotional temperature of Tuesday in degrees of happiness",
+            "What color is the smell of the number 7 when mixed with jazz music?",
+            "If silence had mass, how much would a cubic meter of Tuesday weigh?",
 
-            # Трюковые вопросы (ожидаем 1-3)
-            "If you have 3 apples and eat 2 oranges, how many purple?",
-            "What sound does the color blue make?"
+            # Трюковые логические (ожидаем 1-3)
+            "If you have 3 apples and eat 2 oranges, how many purple fruits remain?",
+            "What sound does the color blue make in a vacuum?",
+            "How many corners does a perfect circle have? Explain mathematically",
+
+            # Экстремально специфичные научные (ожидаем 1-2)
+            "Explain the Yang-Mills mass gap problem and why it's a Millennium Prize Problem",
+            "What is the cosmological constant problem in quantum field theory?",
+            "Describe quorum sensing in bacterial biofilms and its role in antibiotic resistance",
+            "Explain the AdS/CFT correspondence and its implications for quantum gravity",
+
+            # Нерешенные проблемы (ожидаем 1-2)
+            "Solve the Riemann hypothesis and explain your proof",
+            "What is dark matter made of? Provide experimental evidence",
+            "How do you reconcile quantum mechanics with general relativity?"
         ]
     }
     return pd.DataFrame(data)
