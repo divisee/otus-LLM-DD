@@ -9,5 +9,5 @@ vllm:
 
 mlflow:
   experiment_name: "vllm-llm-as-judge"
-  tracking_uri: "file:./mlruns"
+  tracking_uri: "sqlite:///mlflow.db"
 

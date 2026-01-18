@@ -80,6 +80,19 @@ def run_mlflow_experiment():
         mlflow.log_metric("min_judge_score", min(scores))
         mlflow.log_metric("max_judge_score", max(scores))
 
+        # Стандартные базовые метрики
+        mlflow.log_metric("total_questions", len(df))
+        mlflow.log_metric("successful_answers", len([s for s in scores if s >= 3]))
+        mlflow.log_metric("failed_answers", len([s for s in scores if s < 3]))
+        mlflow.log_metric("excellent_answers", len([s for s in scores if s == 5]))
+        mlflow.log_metric("poor_answers", len([s for s in scores if s <= 2]))
+
+        # Процентные метрики
+        success_rate = len([s for s in scores if s >= 3]) / len(scores) * 100
+        excellence_rate = len([s for s in scores if s == 5]) / len(scores) * 100
+        mlflow.log_metric("success_rate_percent", success_rate)
+        mlflow.log_metric("excellence_rate_percent", excellence_rate)
+
         mlflow.log_text(df.to_csv(index=False), "final_results.csv")
 
         print("\n" + "=" * 80)
@@ -88,6 +101,11 @@ def run_mlflow_experiment():
         print(f"Средняя оценка: {avg_score:.2f}/5")
         print(f"Минимальная оценка: {min(scores)}")
         print(f"Максимальная оценка: {max(scores)}")
+        print(f"\nДополнительные метрики:")
+        print(f"Всего вопросов: {len(df)}")
+        print(f"Успешных ответов (≥3): {len([s for s in scores if s >= 3])} ({success_rate:.1f}%)")
+        print(f"Отличных ответов (5): {len([s for s in scores if s == 5])} ({excellence_rate:.1f}%)")
+        print(f"Плохих ответов (≤2): {len([s for s in scores if s <= 2])}")
         print(f"\nRun ID: {run.info.run_id}")
         print("=" * 80)
 

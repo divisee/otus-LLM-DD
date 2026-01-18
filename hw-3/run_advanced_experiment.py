@@ -11,7 +11,7 @@ from vllm_client import VLLMClient
 def create_custom_metric_with_local_model(config: Config):
     grading_prompt = """Оцените качество ответа на вопрос по шкале от 1 до 5.
 
-Вопрос: {input}
+Вопрос: {inputs}
 Ответ: {output}
 
 Верните только число от 1 до 5."""
@@ -43,7 +43,7 @@ def create_custom_metric_with_local_model(config: Config):
         grading_prompt=grading_prompt,
         examples=examples,
         model=f"openai:/{config.vllm_model_name}",
-        grading_context_columns=["input"],
+        grading_context_columns=["inputs"],
         parameters={"temperature": 0.1, "max_tokens": 10},
         aggregations=["mean", "variance", "p90"],
         greater_is_better=True
@@ -131,13 +131,39 @@ def run_advanced_experiment():
             model=wrapped_model,
             data=eval_df,
             model_type="text",
-            extra_metrics=[custom_metric]
+            extra_metrics=[custom_metric],
+            evaluator_config={
+                "col_mapping": {
+                    "inputs": "input",
+                    "predictions": "predictions"
+                }
+            }
         )
+
+        # Дополнительные стандартные метрики
+        mlflow.log_metric("dataset_size", len(eval_df))
+        mlflow.log_metric("total_questions_evaluated", len(eval_df))
+
+        # Если в results.metrics есть наши метрики судьи, логируем дополнительную статистику
+        if 'local_llm_judge/mean' in results.metrics:
+            mean_score = results.metrics['local_llm_judge/mean']
+            mlflow.log_metric("judge_mean_normalized", mean_score / 5.0)  # Нормализованная оценка 0-1
+            mlflow.log_metric("judge_quality_percent", (mean_score / 5.0) * 100)  # В процентах
 
         print("\n" + "=" * 80)
         print("Результаты оценки:")
         print("=" * 80)
         print(results.metrics)
+
+        print(f"\nДополнительные метрики:")
+        print(f"Размер датасета: {len(eval_df)} вопросов")
+        if 'local_llm_judge/mean' in results.metrics:
+            mean_score = results.metrics['local_llm_judge/mean']
+            print(f"Средняя оценка судьи: {mean_score:.2f}/5 ({(mean_score/5.0)*100:.1f}%)")
+        if 'local_llm_judge/variance' in results.metrics:
+            print(f"Разброс оценок: {results.metrics['local_llm_judge/variance']:.3f}")
+        if 'local_llm_judge/p90' in results.metrics:
+            print(f"90-й перцентиль: {results.metrics['local_llm_judge/p90']:.2f}")
 
         print(f"\nRun ID: {run.info.run_id}")
         print("=" * 80)
