@@ -62,6 +62,52 @@ def generate_answers(client: VLLMClient, questions: list) -> list:
     return answers
 
 
+def _safe_trace(name: str, attributes: dict, fn):
+    """Трейсы не должны ломать эксперимент: если tracing недоступен, просто выполняем fn."""
+    try:
+        # MLflow 3.x: context manager
+        with mlflow.trace(name=name, attributes=attributes):
+            return fn()
+    except Exception:
+        return fn()
+
+
+def _trace_question_answer(vllm_client: VLLMClient, llm_judge: LLMJudge, question: str) -> tuple[str, int]:
+    def _run():
+        answer = vllm_client.simple_query(question, method="openai")
+
+        def _judge():
+            return llm_judge.evaluate_answer(question, answer)
+
+        score = _safe_trace(
+            name="judge",
+            attributes={"question": question},
+            fn=_judge,
+        )
+
+        return answer, score
+
+    return _safe_trace(
+        name="qa_item",
+        attributes={"question": question},
+        fn=_run,
+    )
+
+
+def generate_answers_and_scores(vllm_client: VLLMClient, llm_judge: LLMJudge, questions: list) -> tuple[list, list]:
+    answers, scores = [], []
+    for q in questions:
+        try:
+            a, s = _trace_question_answer(vllm_client, llm_judge, q)
+            answers.append(a)
+            scores.append(s)
+        except Exception as e:
+            print(f"Ошибка для вопроса '{q}': {e}")
+            answers.append("Error generating answer")
+            scores.append(3)
+    return answers, scores
+
+
 def _get_or_create_experiment(name: str) -> str:
     exp = mlflow.get_experiment_by_name(name)
     if exp is not None:
@@ -96,20 +142,9 @@ def run_mlflow_experiment():
         mlflow.log_param("base_url", config.vllm_base_url)
 
         print("Генерация ответов модели...")
-        df['model_answer'] = generate_answers(vllm_client, df['question'].tolist())
-
-        mlflow.log_text(df.to_csv(index=False), "test_dataset_with_answers.csv")
+        df['model_answer'], scores = generate_answers_and_scores(vllm_client, llm_judge, df['question'].tolist())
 
         print("\nОценка качества ответов с помощью LLM Judge...")
-        scores = []
-        for idx, row in df.iterrows():
-            try:
-                score = llm_judge.evaluate_answer(row['question'], row['model_answer'])
-                scores.append(score)
-                print(f"  Вопрос {int(idx)+1}/{len(df)}: оценка = {score}")
-            except Exception as e:
-                print(f"  Вопрос {int(idx)+1}/{len(df)}: ошибка - {e}")
-                scores.append(3)
 
         df['judge_score'] = scores
 
