@@ -50,55 +50,22 @@ def create_test_dataset():
     return pd.DataFrame(data)
 
 
-def generate_answers(client: VLLMClient, questions: list) -> list:
-    answers = []
-    for question in questions:
-        try:
-            answer = client.simple_query(question, method="openai")
-            answers.append(answer)
-        except Exception as e:
-            print(f"Ошибка при генерации ответа для '{question}': {e}")
-            answers.append("Error generating answer")
-    return answers
-
-
-def _safe_trace(name: str, attributes: dict, fn):
-    """Трейсы не должны ломать эксперимент: если tracing недоступен, просто выполняем fn."""
-    try:
-        # MLflow 3.x: context manager
-        with mlflow.trace(name=name, attributes=attributes):
-            return fn()
-    except Exception:
-        return fn()
-
-
-def _trace_question_answer(vllm_client: VLLMClient, llm_judge: LLMJudge, question: str) -> tuple[str, int]:
-    def _run():
-        answer = vllm_client.simple_query(question, method="openai")
-
-        def _judge():
-            return llm_judge.evaluate_answer(question, answer)
-
-        score = _safe_trace(
-            name="judge",
-            attributes={"question": question},
-            fn=_judge,
-        )
-
-        return answer, score
-
-    return _safe_trace(
-        name="qa_item",
-        attributes={"question": question},
-        fn=_run,
-    )
-
-
 def generate_answers_and_scores(vllm_client: VLLMClient, llm_judge: LLMJudge, questions: list) -> tuple[list, list]:
+    @_trace_decorator(name="qa_item", attributes={})
+    def generate_one(question: str) -> str:
+        mlflow.set_tag("last_question", question)
+        return vllm_client.simple_query(question, method="openai")
+
+    @_trace_decorator(name="judge", attributes={})
+    def judge_one(question: str, answer: str) -> int:
+        mlflow.set_tag("last_judge_question", question)
+        return llm_judge.evaluate_answer(question, answer)
+
     answers, scores = [], []
     for q in questions:
         try:
-            a, s = _trace_question_answer(vllm_client, llm_judge, q)
+            a = generate_one(q)
+            s = judge_one(q, a)
             answers.append(a)
             scores.append(s)
         except Exception as e:
@@ -106,6 +73,30 @@ def generate_answers_and_scores(vllm_client: VLLMClient, llm_judge: LLMJudge, qu
             answers.append("Error generating answer")
             scores.append(3)
     return answers, scores
+
+
+def _trace_decorator(name: str, attributes: dict):
+    """Обертка: если tracing недоступен в версии MLflow, просто возвращаем исходную функцию."""
+    try:
+        return mlflow.trace(name=name, attributes=attributes)
+    except Exception:
+        def _noop(fn):
+            return fn
+        return _noop
+
+
+def _make_traced_fns(vllm_client: VLLMClient, llm_judge: LLMJudge):
+    @_trace_decorator(name="qa_item", attributes={})
+    def generate_one(question: str) -> str:
+        mlflow.set_tag("last_question", question)
+        return vllm_client.simple_query(question, method="openai")
+
+    @_trace_decorator(name="judge", attributes={})
+    def judge_one(question: str, answer: str) -> int:
+        mlflow.set_tag("last_judge_question", question)
+        return llm_judge.evaluate_answer(question, answer)
+
+    return generate_one, judge_one
 
 
 def _get_or_create_experiment(name: str) -> str:
@@ -134,6 +125,12 @@ def run_mlflow_experiment():
 
     df = create_test_dataset()
     print(f"\nСоздан тестовый датасет с {len(df)} вопросами\n")
+
+    # Включаем автотрейсинг, если доступен (не должен ломать выполнение)
+    try:
+        mlflow.autolog(log_traces=True)
+    except Exception:
+        pass
 
     with mlflow.start_run(run_name="vllm_qwen_evaluation") as run:
         mlflow.log_param("model_name", config.vllm_model_name)

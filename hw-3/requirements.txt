@@ -4,3 +4,4 @@ httpx
 mlflow
 pyyaml
 pandas
+tiktoken
