@@ -68,6 +68,7 @@ def run_mlflow_experiment():
 
     config = Config()
     tracking_uri = _resolve_tracking_uri(config.mlflow_tracking_uri)
+    os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
     vllm_client = VLLMClient(config)
     llm_judge = LLMJudge(config, vllm_client)
 

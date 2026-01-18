@@ -170,6 +170,7 @@ def run_advanced_experiment():
 
     config = Config()
     tracking_uri = _resolve_tracking_uri(config.mlflow_tracking_uri)
+    os.environ["MLFLOW_TRACKING_URI"] = tracking_uri
     vllm_client = VLLMClient(config)
 
     mlflow.set_tracking_uri(tracking_uri)
