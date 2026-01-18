@@ -33,7 +33,8 @@ advanced:
 
 mlflow:
 	@echo "Запуск MLflow UI на http://localhost:5000"
-	mlflow ui --port 5000
+	@echo "Tracking URI: $(shell pwd)/mlruns"
+	cd $(shell pwd) && mlflow ui --backend-store-uri ./mlruns --port 5000
 
 clean:
 	@echo "Очистка временных файлов..."

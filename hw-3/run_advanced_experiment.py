@@ -72,13 +72,29 @@ def create_evaluation_dataset():
 
 def model_function(inputs_df, client: VLLMClient):
     outputs = []
-    for question in inputs_df['input']:
+
+    # MLflow может передать данные по-разному, проверяем все варианты
+    if isinstance(inputs_df, pd.DataFrame):
+        # Пробуем разные названия колонок
+        if 'input' in inputs_df.columns:
+            questions = inputs_df['input'].tolist()
+        elif 'question' in inputs_df.columns:
+            questions = inputs_df['question'].tolist()
+        else:
+            # Берем первую колонку
+            questions = inputs_df.iloc[:, 0].tolist()
+    else:
+        # Если не DataFrame, возможно это Series или список
+        questions = [inputs_df] if isinstance(inputs_df, str) else list(inputs_df)
+
+    for question in questions:
         try:
             answer = client.simple_query(question, method="openai")
             outputs.append(answer)
         except Exception as e:
             print(f"Ошибка для вопроса '{question}': {e}")
             outputs.append(f"Error: {str(e)}")
+
     return outputs
 
 
@@ -114,7 +130,6 @@ def run_advanced_experiment():
         results = mlflow.evaluate(
             model=wrapped_model,
             data=eval_df,
-            targets="input",
             model_type="text",
             extra_metrics=[custom_metric]
         )

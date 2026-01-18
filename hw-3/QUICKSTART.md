@@ -43,11 +43,24 @@ make experiment
 
 ### 5. Просмотрите результаты в MLflow
 
+**ВАЖНО!** Запускайте MLflow UI из папки hw-3:
+
 ```bash
+cd hw-3
 make mlflow
 ```
 
+Или используйте скрипт:
+```bash
+./start_mlflow.sh
+```
+
 Откройте: http://localhost:5000
+
+**Если MLflow UI пустой:**
+1. Остановите MLflow UI (Ctrl+C)
+2. Убедитесь, что вы в папке hw-3
+3. Запустите заново: `make mlflow`
 
 ## Команды
 
