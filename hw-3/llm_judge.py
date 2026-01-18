@@ -1,4 +1,5 @@
 import re
+import os
 from mlflow.metrics.genai import EvaluationExample, make_genai_metric
 from vllm_client import VLLMClient
 from config_loader import Config
@@ -59,6 +60,13 @@ class LLMJudge:
                 justification="Нет ответа."
             )
         ]
+
+        # MLflow genai metrics используют провайдер "openai" по схеме model="openai:/<model_name>".
+        # Чтобы это работало с локальным vLLM (OpenAI-compatible), нужно задать base_url.
+        # Большинство vLLM инсталляций не проверяют ключ, но клиент OpenAI в MLflow требует,
+        # чтобы ключ был задан. Ставим безопасный dummy.
+        os.environ.setdefault("OPENAI_API_KEY", "local-vllm")
+        os.environ.setdefault("OPENAI_BASE_URL", self.config.vllm_base_url)
 
         metric = make_genai_metric(
             name=metric_name,
