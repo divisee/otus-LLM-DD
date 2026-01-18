@@ -1,12 +1,11 @@
-.PHONY: help install check test experiment advanced mlflow clean
+.PHONY: help install check test experiment mlflow clean
 
 help:
 	@echo "Доступные команды:"
 	@echo "  make install    - Установить зависимости"
 	@echo "  make check      - Проверить подключение к vLLM"
 	@echo "  make test       - Тестировать API (requests/httpx/openai)"
-	@echo "  make experiment - Запустить основной эксперимент"
-	@echo "  make advanced   - Запустить расширенный эксперимент"
+	@echo "  make experiment - Запустить эксперимент"
 	@echo "  make mlflow     - Запустить MLflow UI"
 	@echo "  make clean      - Очистить временные файлы"
 
@@ -24,12 +23,8 @@ test:
 	python test_vllm_api.py
 
 experiment:
-	@echo "Запуск основного эксперимента..."
+	@echo "Запуск эксперимента..."
 	python run_experiment.py
-
-advanced:
-	@echo "Запуск расширенного эксперимента..."
-	python run_advanced_experiment.py
 
 mlflow:
 	@echo "Запуск MLflow UI на http://localhost:5000"

@@ -70,8 +70,7 @@ make mlflow
 make install    # Установить зависимости
 make check      # Проверить vLLM сервер
 make test       # Тестировать API (requests/httpx/openai)
-make experiment # Запустить основной эксперимент
-make advanced   # Запустить расширенный эксперимент
+make experiment # Запустить эксперимент
 make mlflow     # Запустить MLflow UI
 make clean      # Очистить временные файлы
 ```
@@ -80,16 +79,15 @@ make clean      # Очистить временные файлы
 
 ```
 hw-3/
-├── config_loader.py              # Загрузчик конфигурации
-├── vllm_client.py               # Клиент vLLM (3 метода)
-├── llm_judge.py                 # Метрика LLM-as-a-Judge
-├── check_vllm.py                # Проверка подключения
-├── test_vllm_api.py             # Тесты API
-├── run_experiment.py            # Основной эксперимент
-├── run_advanced_experiment.py   # Расширенный эксперимент
-├── config.yaml                  # Конфигурация
-├── Makefile                     # Команды управления
-└── requirements.txt             # Зависимости
+├── config_loader.py
+├── vllm_client.py
+├── llm_judge.py
+├── check_vllm.py
+├── test_vllm_api.py
+├── run_experiment.py
+├── config.yaml
+├── Makefile
+└── requirements.txt
 ```
 
 ## Что реализовано
