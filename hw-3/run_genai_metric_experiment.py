@@ -35,11 +35,14 @@ def run_experiment() -> None:
     # Важно: используем тот же набор вопросов, что и в обычном эксперименте.
     df = create_test_dataset()
 
-    def predict_fn(inputs_df: pd.DataFrame):
+    def predict_fn(inputs_df: pd.DataFrame) -> pd.DataFrame:
         outputs = []
         for q in inputs_df["question"].tolist():
             outputs.append(client.simple_query(q, method="openai"))
-        return outputs
+
+        # Для model_type="text" mlflow.evaluate ожидает табличный вывод
+        # c колонкой `predictions`.
+        return pd.DataFrame({"predictions": outputs})
 
     metric = judge.create_mlflow_metric(metric_name="local_genai_judge")
 
@@ -57,6 +60,9 @@ def run_experiment() -> None:
             evaluator_config={
                 "col_mapping": {
                     "question": "question",
+                    # В таблицах evaluate предсказания лежат в колонке `predictions`,
+                    # а genai-метрики ожидают стандартное имя `output`.
+                    "output": "predictions",
                 }
             },
         )

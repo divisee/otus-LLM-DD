@@ -5,3 +5,6 @@ mlflow
 pyyaml
 pandas
 tiktoken
+transformers
+huggingface_hub
+safetensors
