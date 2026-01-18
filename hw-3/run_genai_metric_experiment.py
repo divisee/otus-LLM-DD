@@ -59,6 +59,9 @@ def run_experiment() -> None:
             extra_metrics=[metric],
             evaluator_config={
                 "col_mapping": {
+                    # Для legacy evaluator genai-метрики иногда ожидают `inputs`.
+                    # У нас входной текст лежит в колонке `question`.
+                    "inputs": "question",
                     "question": "question",
                     # В таблицах evaluate предсказания лежат в колонке `predictions`,
                     # а genai-метрики ожидают стандартное имя `output`.
