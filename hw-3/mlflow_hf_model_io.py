@@ -1,17 +1,28 @@
 #!/usr/bin/env python3
-"""MLflow ⇄ HuggingFace: загрузка весов в MLflow и скачивание обратно.
+"""MLflow ⇄ HuggingFace: загрузка весов в MLflow, скачивание и удаление run.
 
 Сценарии:
 1) upload: скачать модель с Hugging Face и залогировать папку модели в MLflow artifacts.
 2) download: скачать артефакт модели из MLflow по run_id обратно в локальную папку.
+3) delete-run: удалить run (самый надёжный способ удалить артефакты модели).
 
 Пример:
-  python mlflow_hf_model_io.py upload --hf-repo Qwen/Qwen2.5-3B-Instruct --artifact-path hf_models/qwen2.5-3b
-  python mlflow_hf_model_io.py download --run-id <RUN_ID> --artifact-path hf_models/qwen2.5-3b --out-dir ./downloaded_model
+  python mlflow_hf_model_io.py upload \
+    --hf-repo Qwen/Qwen2.5-1.5B-Instruct \
+    --artifact-path hf_models/qwen2.5-1.5b-instruct
+
+  python mlflow_hf_model_io.py download \
+    --run-id <RUN_ID> \
+    --artifact-path hf_models/qwen2.5-1.5b-instruct \
+    --out-dir ./downloaded_model
+
+  python mlflow_hf_model_io.py delete-run --run-id <RUN_ID>
 
 Примечания:
 - Для приватных моделей/лимитов Hugging Face можно задать переменную окружения HF_TOKEN.
 - MLflow tracking URI берётся из config.yaml (mlflow.tracking_uri) либо из MLFLOW_TRACKING_URI.
+- В MLflow UI артефакты иногда не видны из-за кеша/не того backend; проверка после upload
+  делает list_artifacts по run_id и подтверждает, что файлы реально записались.
 """
 
 from __future__ import annotations
@@ -23,6 +34,7 @@ from pathlib import Path
 
 import mlflow
 from huggingface_hub import snapshot_download
+from mlflow.tracking import MlflowClient
 
 from config_loader import Config
 
@@ -54,6 +66,20 @@ def _set_mlflow_from_config(experiment_name: str | None) -> None:
         experiment_name = cfg.mlflow_experiment_name
 
     mlflow.set_experiment(experiment_name)
+
+
+def _assert_artifact_present(run_id: str, artifact_path: str) -> None:
+    client = MlflowClient()
+    items = client.list_artifacts(run_id, path=artifact_path)
+    if not items:
+        raise RuntimeError(
+            f"Артефакт не найден в run_id={run_id} по artifact_path='{artifact_path}'. "
+            f"Проверь tracking URI (MLFLOW_TRACKING_URI / config.yaml) и права на artifact store."
+        )
+
+    print(f"Artifact '{artifact_path}' exists. Preview (up to 20):")
+    for it in items[:20]:
+        print(f"  - {it.path}")
 
 
 def upload_hf_model_to_mlflow(
@@ -103,6 +129,7 @@ def upload_hf_model_to_mlflow(
 
         # Логируем всю папку модели как артефакт
         mlflow.log_artifacts(snapshot_path, artifact_path=artifact_path)
+        _assert_artifact_present(run.info.run_id, artifact_path)
 
         artifact_uri = mlflow.get_artifact_uri(artifact_path)
         print(f"Uploaded to run_id={run.info.run_id}")
@@ -125,9 +152,19 @@ def download_model_from_mlflow(
     out_path.mkdir(parents=True, exist_ok=True)
 
     # mlflow.artifacts.download_artifacts вернёт путь до скачанного артефакта
-    local_path = mlflow.artifacts.download_artifacts(run_id=run_id, artifact_path=artifact_path, dst_path=str(out_path))
+    local_path = mlflow.artifacts.download_artifacts(
+        run_id=run_id,
+        artifact_path=artifact_path,
+        dst_path=str(out_path),
+    )
     print(f"Downloaded to: {local_path}")
     return local_path
+
+
+def delete_run(run_id: str, experiment_name: str | None = None) -> None:
+    _set_mlflow_from_config(experiment_name)
+    MlflowClient().delete_run(run_id)
+    print(f"Run marked as deleted: {run_id}")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -159,6 +196,10 @@ def _build_parser() -> argparse.ArgumentParser:
     dl.add_argument("--out-dir", required=True, help="Output directory")
     dl.add_argument("--experiment-name", default=None, help="Override MLflow experiment name")
 
+    dr = sub.add_parser("delete-run", help="Delete MLflow run (removes/hides artifacts with the run)")
+    dr.add_argument("--run-id", required=True, help="MLflow run id")
+    dr.add_argument("--experiment-name", default=None, help="Override MLflow experiment name")
+
     return p
 
 
@@ -184,6 +225,10 @@ def main() -> None:
             out_dir=args.out_dir,
             experiment_name=args.experiment_name,
         )
+        return
+
+    if args.cmd == "delete-run":
+        delete_run(run_id=args.run_id, experiment_name=args.experiment_name)
         return
 
     raise SystemExit(f"Unknown command: {args.cmd}")
