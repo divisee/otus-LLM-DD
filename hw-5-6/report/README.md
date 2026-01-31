@@ -188,7 +188,7 @@ python hw-5-6/scripts/ingest_movies.py --config hw-5-6/config.yaml
 
 ### Схема работы агентов
 
-![](./screenshots/langgraph.png)
+![](./screenshots/langgraph.png) 
 
 Пайплайн построен на LangGraph и состоит из 4 агентов, которые выполняются последовательно. Reviewer может вернуть управление на Gatherer (до 3 раз) если ответ недостаточно полный.
 
