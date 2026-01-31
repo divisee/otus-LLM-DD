@@ -18,7 +18,6 @@
 brew install ollama # MacOS
 curl -fsSL https://ollama.com/install.sh | sh # Ubuntu
 brew services start ollama    # или: ollama serve
-ollama pull nomic-embed-text
 ollama pull embeddinggemma
 ```
 
