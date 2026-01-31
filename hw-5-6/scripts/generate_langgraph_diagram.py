@@ -29,7 +29,7 @@ dot.node('reviewer', 'ReviewAgent\nПроверяет качество\nМоже
 dot.edge('analyzer', 'gatherer', label='JSON с флагами')
 dot.edge('gatherer', 'answerer', label='Собранные данные')
 dot.edge('answerer', 'reviewer', label='JSON с ответом')
-dot.edge('reviewer', 'gatherer', label='refine_needed\n(max 2 итерации)', style='dashed', color='red')
+dot.edge('reviewer', 'gatherer', label='refine_needed\n(max 3 итерации)', style='dashed', color='red')
 
 # Сохраняем как PNG
 output_path = os.path.join(output_dir, 'langgraph')

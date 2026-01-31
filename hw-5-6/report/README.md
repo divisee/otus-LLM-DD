@@ -190,7 +190,7 @@ python hw-5-6/scripts/ingest_movies.py --config hw-5-6/config.yaml
 
 ![](./screenshots/langgraph.png)
 
-Пайплайн построен на LangGraph и состоит из 4 агентов, которые выполняются последовательно. Reviewer может вернуть управление на Gatherer (до 2 раз) если ответ недостаточно полный.
+Пайплайн построен на LangGraph и состоит из 4 агентов, которые выполняются последовательно. Reviewer может вернуть управление на Gatherer (до 3 раз) если ответ недостаточно полный.
 
 ### Агенты
 
@@ -199,7 +199,7 @@ python hw-5-6/scripts/ingest_movies.py --config hw-5-6/config.yaml
 | **AnalyzerAgent** | `rag_graph.py` | `ANALYZER_PROMPT` из `prompts.py` | Анализирует запрос пользователя и решает: нужен ли RAG (поиск в локальной базе) и/или веб-поиск (Tavily). Возвращает JSON с флагами `need_rag`, `need_search`. |
 | **GatherAgent** | `rag_graph.py` | `GATHER_SEARCH_PROMPT` из `prompts.py` | Собирает данные: если `need_rag=true` — ищет в Qdrant по эмбеддингам, если `need_search=true` — формирует поисковый запрос и ищет через Tavily. |
 | **AnswerAgent** | `rag_graph.py` | `ANSWER_PROMPT` из `prompts.py` | Формирует финальный ответ на основе собранных данных (RAG + веб). Возвращает JSON с полем `answer`, списком источников и допущениями. |
-| **ReviewAgent** | `rag_graph.py` | `REVIEW_PROMPT` из `prompts.py` | Проверяет качество ответа. Если данных мало — возвращает `refine_needed=true` с уточняющим запросом для повторного сбора (макс. 2 итерации). |
+| **ReviewAgent** | `rag_graph.py` | `REVIEW_PROMPT` из `prompts.py` | Проверяет качество ответа. Если данных мало — возвращает `refine_needed=true` с уточняющим запросом для повторного сбора (макс. 3 итерации). |
 
 ### Инструменты (Tools)
 
