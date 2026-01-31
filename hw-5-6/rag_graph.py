@@ -23,11 +23,16 @@ _langfuse_cfg = _config.get("langfuse", {})
 
 from langfuse import get_client, Langfuse
 
-langfuse = Langfuse(
-    public_key=_langfuse_cfg["public_key"],
-    secret_key=_langfuse_cfg["secret_key"],
-    host=_langfuse_cfg["base_url"]
-)
+try:
+    langfuse = Langfuse(
+        public_key=_langfuse_cfg["public_key"],
+        secret_key=_langfuse_cfg["secret_key"],
+        host=_langfuse_cfg["base_url"]
+    )
+except Exception as e:
+    print(f"Langfuse initialization failed: {e}. Continuing without logging.")
+    langfuse = None
+
 
 class AnalyzerAgent:
     def __init__(self, llm) -> None:
@@ -43,28 +48,40 @@ class AnalyzerAgent:
         need_rag = True
         need_search = True
 
-        with langfuse.start_as_current_observation(
-            as_type="span",
-            name="analyzer",
-            input={"user_request": user_request},
-        ) as span:
+        if langfuse:
+            span_context = langfuse.start_observation(
+                as_type="span",
+                name="analyzer",
+                input={"user_request": user_request},
+            )
+        else:
+            span_context = None
+
+        try:
             if user_request:
                 try:
-                    with langfuse.start_as_current_observation(
-                        as_type="generation",
-                        name="analyzer_llm",
-                        model=self.llm.model_name,
-                        input=[{"role": "system", "content": ANALYZER_PROMPT}, {"role": "user", "content": user_request}],
-                    ) as generation:
-                        start_time = time.time()
-                        resp = self.llm.invoke(
-                            [
-                                SystemMessage(content=ANALYZER_PROMPT),
-                                HumanMessage(content=user_request),
-                            ]
+                    if langfuse:
+                        generation_context = langfuse.start_observation(
+                            as_type="generation",
+                            name="analyzer_llm",
+                            model=self.llm.model_name,
+                            input=[{"role": "system", "content": ANALYZER_PROMPT}, {"role": "user", "content": user_request}],
                         )
-                        latency = time.time() - start_time
-                        generation.update(output=resp.content, metadata={"latency_s": round(latency, 2)})
+                    else:
+                        generation_context = None
+
+                    start_time = time.time()
+                    resp = self.llm.invoke(
+                        [
+                            SystemMessage(content=ANALYZER_PROMPT),
+                            HumanMessage(content=user_request),
+                        ]
+                    )
+                    latency = time.time() - start_time
+
+                    if generation_context:
+                        generation_context.update(output=resp.content, metadata={"latency_s": round(latency, 2)})
+                        generation_context.end()
 
                     decisions = json.loads(resp.content)
                     need_rag = bool(decisions.get("need_rag", True))
@@ -72,7 +89,8 @@ class AnalyzerAgent:
                     debug.append(f"Analyzer: need_rag={need_rag}, need_search={need_search}")
 
                 except Exception as e:
-                    langfuse.start_observation(name="analyzer_error", as_type="span").update(input={"error": str(e)}).end()
+                    if langfuse:
+                        langfuse.start_observation(name="analyzer_error", as_type="span").update(input={"error": str(e)}).end()
                     request_lower = user_request.lower()
                     if any(word in request_lower for word in ["посовет", "подборк", "рекоменд", "лучшие"]):
                         need_rag = False
@@ -82,7 +100,11 @@ class AnalyzerAgent:
                         need_search = False
                     debug.append("Analyzer: fallback heuristic used.")
 
-            span.update(output={"need_rag": need_rag, "need_search": need_search})
+            if span_context:
+                span_context.update(output={"need_rag": need_rag, "need_search": need_search})
+                span_context.end()
+        except Exception:
+            pass  # If span_context fails, just continue
 
         state["need_rag"] = need_rag
         state["need_search"] = need_search
@@ -117,56 +139,83 @@ class GatherAgent:
         web_results = state.get("web_results", [])  # сохраняем предыдущие результаты
         citations: List[str] = state.get("citations", [])
 
-        with langfuse.start_as_current_observation(
-            as_type="span",
-            name="gatherer",
-            input={"query": effective_query, "need_rag": need_rag, "need_search": need_search},
-        ) as span:
+        if langfuse:
+            span_context = langfuse.start_observation(
+                as_type="span",
+                name="gatherer",
+                input={"query": effective_query, "need_rag": need_rag, "need_search": need_search},
+            )
+        else:
+            span_context = None
+
+        try:
             if need_rag:
-                with langfuse.start_as_current_observation(
-                    as_type="span",
-                    name="rag_search",
-                    input={"query": effective_query},
-                ) as rag_span:
-                    rag_res = self.rag_tool.invoke({"query": effective_query})
-                    rag_docs = rag_res.get("results", [])
-                    rag_span.update(output={"docs_count": len(rag_docs)})
+                if langfuse:
+                    rag_span_context = langfuse.start_observation(
+                        as_type="span",
+                        name="rag_search",
+                        input={"query": effective_query},
+                    )
+                else:
+                    rag_span_context = None
+
+                rag_res = self.rag_tool.invoke({"query": effective_query})
+                rag_docs = rag_res.get("results", [])
+
+                if rag_span_context:
+                    rag_span_context.update(output={"docs_count": len(rag_docs)})
+                    rag_span_context.end()
+
                 debug.append(f"Gather: RAG retrieved {len(rag_docs)} docs.")
 
             if need_search and not web_search_done:
-                with langfuse.start_as_current_observation(
-                    as_type="generation",
-                    name="gather_search_query_llm",
-                    model=self.llm.model_name,
-                    input=[{"role": "system", "content": GATHER_SEARCH_PROMPT}, {"role": "user", "content": effective_query}],
-                ) as generation:
-                    start_time = time.time()
-                    resp = self.llm.invoke(
-                        [
-                            SystemMessage(content=GATHER_SEARCH_PROMPT),
-                            HumanMessage(content=effective_query),
-                        ]
+                if langfuse:
+                    generation_context = langfuse.start_observation(
+                        as_type="generation",
+                        name="gather_search_query_llm",
+                        model=self.llm.model_name,
+                        input=[{"role": "system", "content": GATHER_SEARCH_PROMPT}, {"role": "user", "content": effective_query}],
                     )
-                    latency = time.time() - start_time
-                    generation.update(output=resp.content, metadata={"latency_s": round(latency, 2)})
+                else:
+                    generation_context = None
+
+                start_time = time.time()
+                resp = self.llm.invoke(
+                    [
+                        SystemMessage(content=GATHER_SEARCH_PROMPT),
+                        HumanMessage(content=effective_query),
+                    ]
+                )
+                latency = time.time() - start_time
+
+                if generation_context:
+                    generation_context.update(output=resp.content, metadata={"latency_s": round(latency, 2)})
+                    generation_context.end()
 
                 search_query = resp.content.strip()
                 debug.append(f"Gather: built search query: {search_query}")
 
-                with langfuse.start_as_current_observation(
-                    as_type="span",
-                    name="tavily_search",
-                    input={"query": search_query},
-                ) as tavily_span:
-                    search_res = self.web_tool.invoke({"query": search_query})
-                    web_results = search_res.get("results", [])
-                    tavily_span.update(output={
+                if langfuse:
+                    tavily_span_context = langfuse.start_observation(
+                        as_type="span",
+                        name="tavily_search",
+                        input={"query": search_query},
+                    )
+                else:
+                    tavily_span_context = None
+
+                search_res = self.web_tool.invoke({"query": search_query})
+                web_results = search_res.get("results", [])
+
+                if tavily_span_context:
+                    tavily_span_context.update(output={
                         "results_count": len(web_results),
                         "results": [
                             {"title": r.get("title"), "url": r.get("url"), "content": r.get("content", "")[:500]}
                             for r in web_results
                         ],
                     })
+                    tavily_span_context.end()
 
                 for res in web_results:
                     url = res.get("url")
@@ -178,7 +227,11 @@ class GatherAgent:
             else:
                 debug.append("Gather: search disabled or already done.")
 
-            span.update(output={"rag_docs_count": len(rag_docs), "web_results_count": len(web_results)})
+            if span_context:
+                span_context.update(output={"rag_docs_count": len(rag_docs), "web_results_count": len(web_results)})
+                span_context.end()
+        except Exception:
+            pass
 
         state["rag_docs"] = rag_docs
         state["web_results"] = web_results
@@ -218,35 +271,48 @@ class AnswerAgent:
             {"role": "user", "content": f"Доступные URL-источники:\n{citations}"},
         ]
 
-        with langfuse.start_as_current_observation(
-            as_type="span",
-            name="answerer",
-            input={"user_request": user_request, "rag_docs_count": len(rag_docs), "web_results_count": len(web_results)},
-        ) as span:
-            with langfuse.start_as_current_observation(
-                as_type="generation",
-                name="answerer_llm",
-                model=self.llm.model_name,
-                input=messages_input,
-            ) as generation:
-                messages = [
-                    SystemMessage(content=ANSWER_PROMPT),
-                    HumanMessage(content=f"Запрос пользователя:\n{user_request}"),
-                    HumanMessage(content=f"Локальные данные (RAG):\n{rag_text}"),
-                    HumanMessage(content=f"Результаты веб-поиска (Tavily):\n{web_text}"),
-                    HumanMessage(content=f"Доступные URL-источники:\n{citations}"),
-                ]
+        if langfuse:
+            span_context = langfuse.start_observation(
+                as_type="span",
+                name="answerer",
+                input={"user_request": user_request, "rag_docs_count": len(rag_docs), "web_results_count": len(web_results)},
+            )
+        else:
+            span_context = None
 
-                start_time = time.time()
-                resp = self.llm.invoke(messages)
-                latency = time.time() - start_time
-                generation.update(output=resp.content, metadata={"latency_s": round(latency, 2)})
+        try:
+            if langfuse:
+                generation_context = langfuse.start_observation(
+                    as_type="generation",
+                    name="answerer_llm",
+                    model=self.llm.model_name,
+                    input=messages_input,
+                )
+            else:
+                generation_context = None
+
+            messages = [
+                SystemMessage(content=ANSWER_PROMPT),
+                HumanMessage(content=f"Запрос пользователя:\n{user_request}"),
+                HumanMessage(content=f"Локальные данные (RAG):\n{rag_text}"),
+                HumanMessage(content=f"Результаты веб-поиска (Tavily):\n{web_text}"),
+                HumanMessage(content=f"Доступные URL-источники:\n{citations}"),
+            ]
+
+            start_time = time.time()
+            resp = self.llm.invoke(messages)
+            latency = time.time() - start_time
+
+            if generation_context:
+                generation_context.update(output=resp.content, metadata={"latency_s": round(latency, 2)})
+                generation_context.end()
 
             try:
                 data = json.loads(resp.content)
                 debug.append("Answerer: parsed JSON successfully.")
             except Exception as e:
-                langfuse.start_observation(name="answerer_json_error", as_type="span").update(input={"error": str(e), "raw_content": resp.content[:500]}).end()
+                if langfuse:
+                    langfuse.start_observation(name="answerer_json_error", as_type="span").update(input={"error": str(e), "raw_content": resp.content[:500]}).end()
                 data = {
                     "answer": "Не удалось корректно сформировать JSON-ответ.",
                     "sources": citations,
@@ -254,7 +320,11 @@ class AnswerAgent:
                 }
                 debug.append("Answerer: invalid JSON, fallback used.")
 
-            span.update(output={"answer_length": len(data.get("answer", ""))})
+            if span_context:
+                span_context.update(output={"answer_length": len(data.get("answer", ""))})
+                span_context.end()
+        except Exception:
+            pass
 
         state["itinerary"] = {"answer": data.get("answer", "")}
         state["assumptions"] = data.get("assumptions", [])
@@ -286,27 +356,39 @@ class ReviewAgent:
         refine_needed = False
         refine_query = None
 
-        with langfuse.start_as_current_observation(
-            as_type="span",
-            name="reviewer",
-            input={"user_request": user_request, "refine_iterations": refine_iterations},
-        ) as span:
-            with langfuse.start_as_current_observation(
-                as_type="generation",
-                name="reviewer_llm",
-                model=self.llm.model_name,
-                input=react_input,
-            ) as generation:
-                react_messages = [
-                    SystemMessage(content=REVIEW_PROMPT),
-                    HumanMessage(content=f"Запрос пользователя:\n{user_request}"),
-                    HumanMessage(content=f"Текущий JSON-ответ:\n{json.dumps({'itinerary': itinerary, 'assumptions': assumptions}, ensure_ascii=False)}"),
-                ]
+        if langfuse:
+            span_context = langfuse.start_observation(
+                as_type="span",
+                name="reviewer",
+                input={"user_request": user_request, "refine_iterations": refine_iterations},
+            )
+        else:
+            span_context = None
 
-                start_time = time.time()
-                react_resp = self.llm.invoke(react_messages)
-                latency = time.time() - start_time
-                generation.update(output=react_resp.content, metadata={"latency_s": round(latency, 2)})
+        try:
+            if langfuse:
+                generation_context = langfuse.start_observation(
+                    as_type="generation",
+                    name="reviewer_llm",
+                    model=self.llm.model_name,
+                    input=react_input,
+                )
+            else:
+                generation_context = None
+
+            react_messages = [
+                SystemMessage(content=REVIEW_PROMPT),
+                HumanMessage(content=f"Запрос пользователя:\n{user_request}"),
+                HumanMessage(content=f"Текущий JSON-ответ:\n{json.dumps({'itinerary': itinerary, 'assumptions': assumptions}, ensure_ascii=False)}"),
+            ]
+
+            start_time = time.time()
+            react_resp = self.llm.invoke(react_messages)
+            latency = time.time() - start_time
+
+            if generation_context:
+                generation_context.update(output=react_resp.content, metadata={"latency_s": round(latency, 2)})
+                generation_context.end()
 
             try:
                 react_data = json.loads(react_resp.content)
@@ -314,7 +396,8 @@ class ReviewAgent:
                 refine_query_raw = react_data.get("refine_query") or ""
                 refine_query = refine_query_raw.strip() or None
             except Exception as e:
-                langfuse.start_observation(name="reviewer_json_error", as_type="span").update(input={"error": str(e)}).end()
+                if langfuse:
+                    langfuse.start_observation(name="reviewer_json_error", as_type="span").update(input={"error": str(e)}).end()
                 debug.append("Reviewer: failed to parse refine JSON, assuming refine_needed=false.")
                 refine_needed = False
                 refine_query = None
@@ -333,7 +416,11 @@ class ReviewAgent:
                 state["status"] = "done"  # type: ignore[typeddict-item]
                 debug.append("Reviewer: done.")
 
-            span.update(output={"refine_needed": refine_needed, "refine_query": refine_query})
+            if span_context:
+                span_context.update(output={"refine_needed": refine_needed, "refine_query": refine_query})
+                span_context.end()
+        except Exception:
+            pass
 
         state["debug_notes"] = debug
         return state
@@ -413,29 +500,38 @@ def main() -> None:
 
     run_config = {"configurable": {"thread_id": "default"}}
 
-    with langfuse.start_as_current_observation(
-        as_type="span",
-        name="movie_agent_pipeline",
-        input={"query": args.query},
-        metadata={"config_path": str(args.config)},
-    ) as root_span:
+    if langfuse:
+        root_span_context = langfuse.start_observation(
+            as_type="span",
+            name="movie_agent_pipeline",
+            input={"query": args.query},
+            metadata={"config_path": str(args.config)},
+        )
+    else:
+        root_span_context = None
+
+    try:
         start_time = time.time()
         result = graph.invoke(initial_state, config=run_config)
         total_latency = time.time() - start_time
 
-        root_span.update(
-            output={
-                "answer": result.get("itinerary", {}).get("answer", ""),
-                "citations": result.get("citations", []),
-                "assumptions": result.get("assumptions", []),
-                "status": result.get("status"),
-            },
-            metadata={
-                "total_debug_notes": len(result.get("debug_notes", [])),
-                "final_status": result.get("status"),
-                "total_latency_s": round(total_latency, 2),
-            },
-        )
+        if root_span_context:
+            root_span_context.update(
+                output={
+                    "answer": result.get("itinerary", {}).get("answer", ""),
+                    "citations": result.get("citations", []),
+                    "assumptions": result.get("assumptions", []),
+                    "status": result.get("status"),
+                },
+                metadata={
+                    "total_debug_notes": len(result.get("debug_notes", [])),
+                    "final_status": result.get("status"),
+                    "total_latency_s": round(total_latency, 2),
+                },
+            )
+            root_span_context.end()
+    except Exception:
+        pass
 
     print("=== DEBUG NOTES ===")
     for note in result.get("debug_notes", []):
@@ -443,7 +539,8 @@ def main() -> None:
     print("=== RESULT ===")
     print(json.dumps(result.get("itinerary", {}), ensure_ascii=False, indent=2))
 
-    langfuse.flush()
+    if langfuse:
+        langfuse.flush()
 
 
 if __name__ == "__main__":
