@@ -1,0 +1,29 @@
+qdrant:
+  url: "http://localhost:6333"
+  api_key: ""
+  collection_name: "movies"
+
+ollama:
+  base_url: "http://localhost:11434"
+  embedding_model: "embeddinggemma"
+
+langfuse:
+  base_url: "http://localhost:3001"
+  public_key: "pk-lf-ключ"
+  secret_key: "sk-lf-ключ"
+
+tavily:
+  api_key: "tvly-ключ"
+
+openai:
+  base_url: "https://api.openai.com/v1"
+  model: "gpt-4o-mini"
+  api_key: "sk-openai-ключ"
+
+data:
+  csv_path: "data/data_films.csv"
+  text_column: "Description Kinopoisk"
+
+ingest:
+  batch_size: 64
+  distance: "cosine"

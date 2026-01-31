@@ -1,0 +1,15 @@
+services:
+  movie-agent:
+    build: .
+    container_name: movie-agent
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./data:/app/data:ro
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - TAVILY_API_KEY=${TAVILY_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped

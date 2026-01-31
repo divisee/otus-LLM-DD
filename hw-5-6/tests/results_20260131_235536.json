@@ -1,0 +1,43 @@
+{
+  "timestamp": "2026-01-31T23:55:36.334560",
+  "tests_count": 5,
+  "passed": 5,
+  "failed": 0,
+  "results": [
+    {
+      "name": "RAG: Фильм про мальчика с волшебными силами",
+      "query": "Найди фильм про мальчика с волшебными силами который учится в школе магии",
+      "returncode": 0,
+      "stdout": "=== DEBUG NOTES ===\nAnalyzer: need_rag=True, need_search=False\nGather: RAG retrieved 10 docs.\nGather: search disabled or already done.\nAnswerer: parsed JSON successfully.\nReviewer: done.\n=== RESULT ===\n{\n  \"answer\": \"Подходящий фильм о мальчике с волшебными силами, который учится в школе магии — это \\\"Гарри Поттер\\\". В этом фильме Гарри узнает, что он волшебник и поступает в школу магии Хогвартс, где его ждут невероятные приключения. Вот несколько частей этой серии:\\n\\n1. \\\"Гарри Поттер и философский камень\\\" — первый фильм, где Гарри узнает о своем волшебном наследии.\\n2. \\\"Гарри Поттер и Тайная комната\\\" — второй фильм, в котором Гарри сталкивается с новыми опасностями в Хогвартсе.\\n3. \\\"Гарри Поттер и узник Азкабана\\\" — третий фильм, где Гарри раскрывает тайну узника, сбежавшего из тюрьмы.\\n4. \\\"Гарри Поттер и Кубок огня\\\" — четвертый фильм, в котором Гарри участвует в Турнире Трех Волшебников.\\n\\nЭти фильмы идеально подходят под ваш запрос.\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "name": "RAG: Фильм про ограбление казино",
+      "query": "Что за фильм где команда грабит три казино в Лас-Вегасе",
+      "returncode": 0,
+      "stdout": "=== DEBUG NOTES ===\nAnalyzer: need_rag=True, need_search=False\nGather: RAG retrieved 10 docs.\nGather: search disabled or already done.\nAnswerer: parsed JSON successfully.\nReviewer: requesting another gather iteration (iteration #1, query='Уточните, пожалуйста, название фильма, который вы ищете. Возможно, это \"Ограбление по-итальянски\", но в нем команда грабит не три казино, а золотые слитки. Если вы имеете в виду другой фильм, дайте больше деталей.').\nGather: RAG retrieved 10 docs.\nGather: search disabled or already done.\nAnswerer: parsed JSON successfully.\nReviewer: requesting another gather iteration (iteration #2, query='Найди информацию о фильме, где команда грабит три казино в Лас-Вегасе, возможно, это 'Оcean's Eleven' или что-то подобное.').\nGather: RAG retrieved 10 docs.\nGather: search disabled or already done.\nAnswerer: parsed JSON successfully.\nReviewer: requesting another gather iteration (iteration #3, query='Уточните, пожалуйста, название фильма, который вы ищете. Возможно, вы имеете в виду \"Ограбление по-итальянски\" или другой фильм, так как в нем команда грабит не казино, а золотой запас. Также уточните, интересуют ли вас другие фильмы о грабежах.').\nGather: RAG retrieved 10 docs.\nGather: search disabled or already done.\nAnswerer: parsed JSON successfully.\nReviewer: refine limit reached, stopping.\nReviewer: done.\n=== RESULT ===\n{\n  \"answer\": \"Фильм, который соответствует вашему запросу о команде, грабящей три казино в Лас-Вегасе, это \\\"Ограбление по-итальянски\\\". В этом фильме группа грабителей разрабатывает план ограбления трех казино. \\n\\nВот несколько других фильмов, которые могут вас заинтересовать:\\n1. \\\"Начало\\\" - история о воре, который крадет идеи из подсознания.\\n2. \\\"Семь психопатов\\\" - комедия о грабежах и запутанных ситуациях.\\n3. \\\"Старые стулья\\\" - комедия о поисках сокровищ с элементами авантюры.\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "name": "WEB: Топ комедий 2025",
+      "query": "Посоветуй топ 5 лучших комедий 2025 года",
+      "returncode": 0,
+      "stdout": "=== DEBUG NOTES ===\nAnalyzer: need_rag=False, need_search=True\nGather: built search query: \"топ 5 лучших комедий 2025 года\"\nGather: Tavily returned 10 results and 10 urls.\nAnswerer: parsed JSON successfully.\nReviewer: requesting another gather iteration (iteration #1, query='Пожалуйста, предоставьте актуальную информацию о лучших комедиях 2025 года, включая их краткие описания и информацию о режиссерах или актерах.').\nGather: web search already done, skipping.\nGather: search disabled or already done.\nAnswerer: parsed JSON successfully.\nReviewer: requesting another gather iteration (iteration #2, query='Пожалуйста, предоставь актуальные данные о лучших комедиях 2025 года, включая информацию о режиссерах, актерах и сюжетах.').\nGather: web search already done, skipping.\nGather: search disabled or already done.\nAnswerer: parsed JSON successfully.\nReviewer: requesting another gather iteration (iteration #3, query='Пожалуйста, предоставьте актуальные данные о лучших комедиях 2025 года, включая информацию о сюжете и актерах.').\nGather: web search already done, skipping.\nGather: search disabled or already done.\nAnswerer: parsed JSON successfully.\nReviewer: refine limit reached, stopping.\nReviewer: done.\n=== RESULT ===\n{\n  \"answer\": \"Вот топ 5 лучших комедий 2025 года:\\n1. Финикийская схема\\n2. Счастливчик Гилмор 2\\n3. Голый пистолет\\n4. Дружба\\n5. Обезьяна\\n\\nЭти фильмы получили положительные отзывы и обещают быть интересными.\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "name": "WEB: Фильмы для семейного просмотра",
+      "query": "Подбери фильмы для семейного просмотра на выходные",
+      "returncode": 0,
+      "stdout": "=== DEBUG NOTES ===\nAnalyzer: need_rag=False, need_search=True\nGather: built search query: фильмы для семейного просмотра на выходные\nGather: Tavily returned 10 results and 10 urls.\nAnswerer: parsed JSON successfully.\nReviewer: done.\n=== RESULT ===\n{\n  \"answer\": \"Вот несколько фильмов для семейного просмотра на выходные:\\n\\n1. **Чебурашка** - популярный фильм, который понравится как детям, так и взрослым.\\n2. **Мой сосед Тоторо** - анимационная классика, которая рассказывает о дружбе и приключениях.\\n3. **Бременские музыканты** - музыкальный фильм, который станет отличным выбором для всей семьи.\\n4. **Алиса в Стране чудес** - волшебная история, полная приключений и необычных персонажей.\\n5. **Артур, ты король** - фильм о приключениях и дружбе, который будет интересен детям.\\n\\nЭти фильмы помогут создать уютную атмосферу для семейного вечера.\"\n}\n",
+      "stderr": ""
+    },
+    {
+      "name": "MIXED: Драмы про семью",
+      "query": "Найди хорошие драмы про семейные отношения",
+      "returncode": 0,
+      "stdout": "=== DEBUG NOTES ===\nAnalyzer: need_rag=False, need_search=True\nGather: built search query: хорошие драмы про семейные отношения фильмы\nGather: Tavily returned 10 results and 10 urls.\nAnswerer: parsed JSON successfully.\nReviewer: requesting another gather iteration (iteration #1, query='Пожалуйста, добавь больше информации о каждом фильме, включая год выпуска и краткий сюжет.').\nGather: web search already done, skipping.\nGather: search disabled or already done.\nAnswerer: parsed JSON successfully.\nReviewer: requesting another gather iteration (iteration #2, query='Пожалуйста, предоставь более подробные описания фильмов, включая их режиссеров, годы выпуска и основные темы, чтобы помочь пользователю лучше понять, какие из них могут быть интересны.').\nGather: web search already done, skipping.\nGather: search disabled or already done.\nAnswerer: parsed JSON successfully.\nReviewer: requesting another gather iteration (iteration #3, query='Пожалуйста, предоставь более подробные описания фильмов и их тематику, а также укажи год выпуска и режиссера.').\nGather: web search already done, skipping.\nGather: search disabled or already done.\nAnswerer: parsed JSON successfully.\nReviewer: refine limit reached, stopping.\nReviewer: done.\n=== RESULT ===\n{\n  \"answer\": \"Вот несколько отличных драм про семейные отношения:\\n\\n1. **Брачная история** - фильм о сложностях и нюансах брака.\\n2. **Скрытое** - глубокая драма, исследующая семейные тайны.\\n3. **Седьмой континент** - фильм о кризисе в семье и поиске себя.\\n4. **Запретная страсть** - история о запретной любви и ее последствиях.\\n5. **Стальная хватка** - драма о семейных узах и борьбе за выживание.\\n\\nЭти фильмы подойдут для глубокого анализа семейных отношений.\"\n}\n",
+      "stderr": ""
+    }
+  ]
+}
