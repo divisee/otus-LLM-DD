@@ -72,7 +72,7 @@ class AnalyzerAgent:
                     debug.append(f"Analyzer: need_rag={need_rag}, need_search={need_search}")
 
                 except Exception as e:
-                    langfuse.start_observation(name="analyzer_error", as_type="event").update(input={"error": str(e)}).end()
+                    langfuse.start_observation(name="analyzer_error", as_type="span").update(input={"error": str(e)}).end()
                     request_lower = user_request.lower()
                     if any(word in request_lower for word in ["посовет", "подборк", "рекоменд", "лучшие"]):
                         need_rag = False
@@ -246,7 +246,7 @@ class AnswerAgent:
                 data = json.loads(resp.content)
                 debug.append("Answerer: parsed JSON successfully.")
             except Exception as e:
-                langfuse.start_observation(name="answerer_json_error", as_type="event").update(input={"error": str(e), "raw_content": resp.content[:500]}).end()
+                langfuse.start_observation(name="answerer_json_error", as_type="span").update(input={"error": str(e), "raw_content": resp.content[:500]}).end()
                 data = {
                     "answer": "Не удалось корректно сформировать JSON-ответ.",
                     "sources": citations,
@@ -274,6 +274,8 @@ class ReviewAgent:
         itinerary = state.get("itinerary", {})
         assumptions = state.get("assumptions", [])
         refine_iterations = state.get("refine_iterations", 0)
+
+        max_iterations = _config.get("agent", {}).get("max_refine_iterations", 3)
 
         react_input = [
             {"role": "system", "content": REVIEW_PROMPT},
@@ -312,19 +314,19 @@ class ReviewAgent:
                 refine_query_raw = react_data.get("refine_query") or ""
                 refine_query = refine_query_raw.strip() or None
             except Exception as e:
-                langfuse.start_observation(name="reviewer_json_error", as_type="event").update(input={"error": str(e)}).end()
+                langfuse.start_observation(name="reviewer_json_error", as_type="span").update(input={"error": str(e)}).end()
                 debug.append("Reviewer: failed to parse refine JSON, assuming refine_needed=false.")
                 refine_needed = False
                 refine_query = None
 
-            if refine_needed and refine_iterations < 3 and refine_query:
+            if refine_needed and refine_iterations < max_iterations and refine_query:
                 state["refine_needed"] = True
                 state["refine_query"] = refine_query
                 state["refine_iterations"] = refine_iterations + 1
                 state["status"] = "gathering"  # type: ignore[typeddict-item]
                 debug.append(f"Reviewer: requesting another gather iteration (iteration #{state['refine_iterations']}, query='{refine_query}').")
             else:
-                if refine_needed and refine_iterations >= 3:
+                if refine_needed and refine_iterations >= max_iterations:
                     debug.append("Reviewer: refine limit reached, stopping.")
                 state["refine_needed"] = False
                 state["refine_query"] = None

@@ -27,3 +27,6 @@ data:
 ingest:
   batch_size: 64
   distance: "cosine"
+
+agent:
+  max_refine_iterations: 3

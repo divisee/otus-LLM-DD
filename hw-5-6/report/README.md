@@ -233,7 +233,7 @@ python rag_graph.py --config config.yaml --query "Найди фильм про �
 | Spans (tools) | `tools_rag.py` | `rag_retrieve`, `ollama_embed`, `qdrant_search` |
 | Spans (tools) | `tools_tavily.py` | `tavily_search` |
 | Generations | LLM вызовы | `analyzer_llm`, `gather_search_query_llm`, `answerer_llm`, `reviewer_llm` |
-| Events | Ошибки | `analyzer_error`, `answerer_json_error`, `reviewer_json_error`, `tavily_error` |
+| Spans | Ошибки | `analyzer_error`, `answerer_json_error`, `reviewer_json_error`, `tavily_error` |
 | Scores | Метрики | `pipeline_latency`, `rag_top_score` |
 
 ## 5) Примеры работы пайплайна
@@ -321,4 +321,3 @@ curl -X POST http://localhost:8000/query \
    - **API Key:** любой
 4. Сохраните и выберите модель `movie-agent` в чате
 5. Теперь можно общаться с агентом через интерфейс Open WebUI
-
