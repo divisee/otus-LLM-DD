@@ -196,7 +196,7 @@ python hw-5-6/scripts/ingest_movies.py --config hw-5-6/config.yaml
 
 | Агент | Файл | Промпт | Что делает |
 |-------|------|--------|------------|
-| **AnalyzerAgent** | `rag_graph.py` | `ANALYZER_PROMPT` из `prompts.py` | Анализирует запрос пользователя и решает: нужен ли RAG (поиск в локальной базе) и/или веб-поиск (Tavily). Возвращает JSON с флагами `need_rag`, `need_search`. |
+| **AnalyzerAgent** | `rag_graph.py` | `ANALYZER_PROMPT` из `prompts.py` | Анализирует запрос пользователя, очищает его от приветствий и вежливых фраз, оставляя только суть по фильмам, и решает: нужен ли RAG (поиск в локальной базе) и/или веб-поиск (Tavily). Возвращает JSON с полями `cleaned_query`, `need_rag`, `need_search`. |
 | **GatherAgent** | `rag_graph.py` | `GATHER_SEARCH_PROMPT` из `prompts.py` | Собирает данные: если `need_rag=true` — ищет в Qdrant по эмбеддингам, если `need_search=true` — формирует поисковый запрос и ищет через Tavily. |
 | **AnswerAgent** | `rag_graph.py` | `ANSWER_PROMPT` из `prompts.py` | Формирует финальный ответ на основе собранных данных (RAG + веб). Возвращает JSON с полем `answer`, списком источников и допущениями. |
 | **ReviewAgent** | `rag_graph.py` | `REVIEW_PROMPT` из `prompts.py` | Проверяет качество ответа. Если данных мало — возвращает `refine_needed=true` с уточняющим запросом для повторного сбора (макс. 3 итерации). |
@@ -321,3 +321,35 @@ curl -X POST http://localhost:8000/query \
    - **API Key:** любой
 4. Сохраните и выберите модель `movie-agent` в чате
 5. Теперь можно общаться с агентом через интерфейс Open WebUI
+
+### Скриншоты настройки
+
+#### 1) Запуск uvicorn
+
+Команда запуска API сервиса:
+
+```bash
+uvicorn api:app --host 0.0.0.0 --port 8000 --reload
+```
+
+![Запуск uvicorn](./screenshots/start_uvicorn.png)
+
+#### 2) Настройка Open WebUI
+
+Настройка подключения к OpenAI API в Open WebUI для общения с агентом через совместимый интерфейс.
+
+![Настройка Open WebUI](./screenshots/openwebui_setup.png)
+
+## 7) Эксперименты
+
+### Эксперимент 1: RAG без веб-поиска
+
+Агент использует только локальную базу данных фильмов (RAG) для поиска информации, без обращения к интернету.
+
+![RAG без веб-поиска](./screenshots/openweb_rag.png)
+
+### Эксперимент 2: С веб-поиском
+
+В этом случае агент выполняет поиск в интернете через Tavily для получения актуальной информации.
+
+![С веб-поиском](./screenshots/openweb_web.png)

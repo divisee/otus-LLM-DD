@@ -45,6 +45,7 @@ class AnalyzerAgent:
         state["user_request"] = " ".join(m["content"] for m in messages if m["role"] == "user").strip()
         user_request = state.get("user_request", "")
 
+
         need_rag = True
         need_search = True
 
@@ -86,6 +87,9 @@ class AnalyzerAgent:
                     decisions = json.loads(resp.content)
                     need_rag = bool(decisions.get("need_rag", True))
                     need_search = bool(decisions.get("need_search", True))
+                    user_request = decisions.get("cleaned_query", user_request)
+                    state["user_request"] = user_request
+                    debug.append(f"Analyzer: cleaned query: '{user_request}'")
                     debug.append(f"Analyzer: need_rag={need_rag}, need_search={need_search}")
 
                 except Exception as e:
@@ -133,7 +137,10 @@ class GatherAgent:
             debug.append("Gather: web search already done, skipping.")
 
         refine_query = state.get("refine_query")
-        effective_query = refine_query or user_request
+        user_request = state.get("user_request", "")
+
+        rag_query = user_request  # Always use original user query for RAG
+        web_query = refine_query or user_request  # Use refined query for web if available
 
         rag_docs: List[Dict[str, Any]] = []
         web_results = state.get("web_results", [])  # сохраняем предыдущие результаты
@@ -143,7 +150,7 @@ class GatherAgent:
             span_context = langfuse.start_observation(
                 as_type="span",
                 name="gatherer",
-                input={"query": effective_query, "need_rag": need_rag, "need_search": need_search},
+                input={"rag_query": rag_query, "web_query": web_query, "need_rag": need_rag, "need_search": need_search},
             )
         else:
             span_context = None
@@ -154,16 +161,16 @@ class GatherAgent:
                     rag_span_context = langfuse.start_observation(
                         as_type="span",
                         name="rag_search",
-                        input={"query": effective_query},
+                        input={"query": rag_query},
                     )
                 else:
                     rag_span_context = None
 
-                rag_res = self.rag_tool.invoke({"query": effective_query})
+                rag_res = self.rag_tool.invoke({"query": rag_query})
                 rag_docs = rag_res.get("results", [])
 
                 if rag_span_context:
-                    rag_span_context.update(output={"docs_count": len(rag_docs)})
+                    rag_span_context.update(output={"docs_count": len(rag_docs), "docs": rag_docs})
                     rag_span_context.end()
 
                 debug.append(f"Gather: RAG retrieved {len(rag_docs)} docs.")
@@ -174,7 +181,7 @@ class GatherAgent:
                         as_type="generation",
                         name="gather_search_query_llm",
                         model=self.llm.model_name,
-                        input=[{"role": "system", "content": GATHER_SEARCH_PROMPT}, {"role": "user", "content": effective_query}],
+                        input=[{"role": "system", "content": GATHER_SEARCH_PROMPT}, {"role": "user", "content": web_query}],
                     )
                 else:
                     generation_context = None
@@ -183,7 +190,7 @@ class GatherAgent:
                 resp = self.llm.invoke(
                     [
                         SystemMessage(content=GATHER_SEARCH_PROMPT),
-                        HumanMessage(content=effective_query),
+                        HumanMessage(content=web_query),
                     ]
                 )
                 latency = time.time() - start_time
