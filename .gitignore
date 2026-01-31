@@ -3,6 +3,19 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Config files with secrets
+config.yaml
+
 # C extensions
 *.so
 
