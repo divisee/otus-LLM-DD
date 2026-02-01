@@ -99,10 +99,13 @@ async def query_movies(request: QueryRequest):
         ) as root:
             root.update_trace(name="movie_agent_pipeline", input={"query": request.query})
             result = graph.invoke(initial_state, config=run_config)  # type: ignore[arg-type]
-            root.update(output={"status": result.get("status", "done")})
+            final_answer = result.get("itinerary", {}).get("answer", "")
+            root.update(
+                output={"status": result.get("status", "done"), "final_answer": final_answer}
+            )
 
         return QueryResponse(
-            answer=result.get("itinerary", {}).get("answer", "Не удалось получить ответ"),
+            answer=final_answer or "Не удалось получить ответ",
             sources=result.get("citations", []),
             assumptions=result.get("assumptions", []),
             debug_notes=result.get("debug_notes", []),

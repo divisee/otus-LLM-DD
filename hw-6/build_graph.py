@@ -125,14 +125,17 @@ def main() -> None:
         root.update_trace(name="movie_agent_pipeline", input={"query": args.query})
         result = graph.invoke(initial_state, config=run_config)
         total_latency = time.time() - start_time
-        root.update(output={"status": result.get("status", "done")}, metadata={"latency_s": round(total_latency, 2)})
+        answers = result.get("answers", [])
+        final_answer = answers[-1] if answers else result.get("itinerary", {}).get("answer", "")
+        root.update(
+            output={"status": result.get("status", "done"), "final_answer": final_answer},
+            metadata={"latency_s": round(total_latency, 2)},
+        )
 
     print("=== DEBUG NOTES ===")
     for note in result.get("debug_notes", []):
         print(note)
     print("=== RESULT ===")
-    answers = result.get("answers", [])
-    final_answer = answers[-1] if answers else result.get("itinerary", {}).get("answer", "")
     print(json.dumps({"answer": final_answer}, ensure_ascii=False, indent=2))
 
     try:
