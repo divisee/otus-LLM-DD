@@ -120,7 +120,7 @@ def step_two_decorated(data):
 
 ![Decorated trace](screenshots/process_data_decorated.png)
 
-## Эксперимент 3: ручное логирование без декоратора
+## Эксперимент 3: самостоятельное логирование (без декоратора)
 
 Файл: `hw-5/demo_observe.py`
 
