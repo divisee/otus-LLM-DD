@@ -119,7 +119,9 @@ def main() -> None:
     for note in result.get("debug_notes", []):
         print(note)
     print("=== RESULT ===")
-    print(json.dumps(result.get("itinerary", {}), ensure_ascii=False, indent=2))
+    answers = result.get("answers", [])
+    final_answer = answers[-1] if answers else result.get("itinerary", {}).get("answer", "")
+    print(json.dumps({"answer": final_answer}, ensure_ascii=False, indent=2))
 
     if langfuse:
         try:

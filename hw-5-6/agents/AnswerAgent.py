@@ -71,4 +71,7 @@ class AnswerAgent:
         state["citations"] = data.get("sources", citations)
         state["status"] = "answering"
         state["debug_notes"] = debug
+
+        state["answers"] = state.get("answers", []) + [data.get("answer", "")]
+
         return state

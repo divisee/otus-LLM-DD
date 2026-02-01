@@ -31,3 +31,4 @@ class User_State(TypedDict, total=False):
 
     itinerary: Dict[str, Any]
     assumptions: List[str]
+    answers: List[str]
