@@ -210,7 +210,7 @@ python hw-6/scripts/ingest_movies.py --config hw-6/config.yaml
 | **AnalyzerAgent** | `agents/AnalyzerAgent.py` | `ANALYZER_PROMPT` из `agents/prompts.py` | Анализирует запрос пользователя, очищает его от приветствий и вежливых фраз, оставляя только суть по фильмам, и решает: нужен ли RAG (поиск в локальной базе) и/или веб-поиск (Tavily). Возвращает JSON с полями `cleaned_query`, `need_rag`, `need_search`. |
 | **GatherAgent** | `agents/GatherAgent.py` | `GATHER_SEARCH_PROMPT` из `agents/prompts.py` | Собирает данные: всегда делает RAG по `effective_query`, и если нужно — веб-поиск по тому же `effective_query`, затем очищает результаты веб-поиска с помощью LLM. |
 | **AnswerAgent** | `agents/AnswerAgent.py` | `ANSWER_PROMPT` из `agents/prompts.py` | Формирует финальный ответ на основе собранных данных (RAG + веб). Возвращает JSON с полем `answer`, списком источников и допущениями. Накопляет ответы и возвращает наиболее проработанный (последний). |
-| **ReviewAgent** | `agents/ReviewAgent.py` | `REVIEW_PROMPT` из `agents/prompts.py` | Проверяет качество ответа. Если данных мало — возвращает `refine_needed=true` с перефразированным запросом (тот же смысл, другая формулировка). Принудительно уточняет, если веб-поиск не выполнен. |
+| **ReviewAgent** | `agents/ReviewAgent.py` | `REVIEW_PROMPT` из `agents/prompts.py` | Проверяет качество ответа. Если данных мало — возвращает `refine_needed=true` с перефразированным запросом (тот же смысл, другая формулировка).|
 
 ### Инструменты (Tools)
 
