@@ -34,6 +34,56 @@
 
 Сценарий создает один root span и вложенные наблюдения всех доступных типов, включая generation, embedding, agent, tool, retriever, guardrail и ошибки. Скриншот показывает развернутый трейс с таймлайном и статусами.
 
+Примеры нескольких вызовов:
+
+```python
+langfuse = get_client()
+
+with langfuse.start_as_current_observation(
+    as_type="span",
+    name="example_trace",
+    input={"started": True},
+) as root:
+    with root.start_as_current_observation(
+        as_type="agent",
+        name="planner_agent",
+        input={"goal": "Find capital of France"},
+    ) as agent_span:
+        agent_span.update(output={"status": "completed"})
+
+    with root.start_as_current_observation(
+        as_type="tool",
+        name="wiki_search",
+        input={"query": "capital of France"},
+    ) as tool_span:
+        tool_span.update(output={"hits": 3})
+
+    with root.start_as_current_observation(
+        as_type="generation",
+        name="llm_call",
+        model="gpt-4o-mini",
+        model_parameters={"temperature": "0.7"},
+        input={"prompt": "What is the capital of France?"},
+    ) as gen:
+        gen.update(
+            output="The capital of France is Paris.",
+            usage_details={
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "total_tokens": 15,
+            },
+        )
+
+    with root.start_as_current_observation(
+        as_type="span",
+        name="error_occurred",
+        level="ERROR",
+        status_message="Connection timeout",
+        metadata={"error": "Connection timeout", "code": 500},
+    ) as error_span:
+        error_span.update(output={"retry": False})
+```
+
 ![Example trace](screenshots/example_trace.png)
 
 ## Эксперимент 2: декоратор @observe

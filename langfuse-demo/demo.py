@@ -23,7 +23,7 @@ if missing:
 langfuse = get_client()
 
 try:
-    # ROOT observation (span) = старт новой trace (теперь trace создаётся имплицитно)
+    # ROOT observation (span) = старт новой trace (теперь trace создаётся автоматически)
     with langfuse.start_as_current_observation(
         as_type="span",
         name="example_trace",
