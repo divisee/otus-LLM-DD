@@ -1,170 +1,115 @@
-# Langfuse Demo
+# Домашнее задание 5 "Создание собственного LLM-приложения с подключением API и мониторингом через Langfuse"
 
-Демо-папка с тремя экспериментами по трассировке в Langfuse: полный набор типов наблюдений, запуск через декоратор и ручное логирование без декоратора.
+## Цель:
+В этом ДЗ вы создадите собственное LLM-приложение с полным циклом мониторинга и анализа производительности.
 
-## Настройка
 
-1. Установите зависимости:
+## Описание/Пошаговая инструкция выполнения домашнего задания:
+### 📝Этап 1: Выбор и реализация LLM-приложения.
 
-   ```bash
-   pip install -r requirements.txt
-   ```
+Варианты приложений на выбор:
 
-2. Создайте файл `langfuse-demo/.env` и заполните переменные окружения:
+- 🔍 RAG-система
 
-   ```dotenv
-   LANGFUSE_SECRET_KEY=sk-lf-...
-   LANGFUSE_PUBLIC_KEY=pk-lf-...
-   LANGFUSE_BASE_URL=https://cloud.langfuse.com
-   ```
+Загружает документ и отвечает на вопросы по его содержанию.
+- 📄 Суммаризатор документов
 
-3. Запустите нужный эксперимент:
+Создает краткое изложение загруженного текстового файла.
+- 🤖 Простой чат-бот
 
-   ```bash
-   python demo.py
-   python demo_observe.py
-   ```
-Общий список трейсов после запуска экспериментов:
+Ведет диалог с пользователем, запоминая контекст беседы.
+- 📊 Анализатор текста
 
-![Traces list](screenshots/traces.png)
+Извлекает ключевые темы, настроения или инсайты из текста.
+- 🔄 Переводчик с контекстом
 
-## Эксперимент 1: полный набор типов наблюдений
+Переводит тексты с учетом контекста и стиля.
+Или любой ваш вариант.
 
-Файл: `langfuse-demo/demo.py`
 
-Сценарий создает один root span и вложенные наблюдения всех доступных типов, включая generation, embedding, agent, tool, retriever, guardrail и ошибки. Скриншот показывает развернутый трейс с таймлайном и статусами.
+### Технические требования:
+- Формат: Jupyter notebook, Python скрипт, или простое веб-приложение.
+- Модели: OpenAI GPT или другие доступные LLM.
 
-Примеры нескольких вызовов:
+### 🔧 Этап 2: Изучение Langfuse.
 
-```python
-langfuse = get_client()
+#### Основные сущности для изучения:
+- Traces - полный путь выполнения запроса.
+- Spans - отдельные операции (вызов LLM, поиск в БД).
+- Generations - специальные spans для LLM вызовов.
+- Events - точечные события (загрузка файла, ошибки).
+- Scores - метрики качества и производительности.
 
-with langfuse.start_as_current_observation(
-    as_type="span",
-    name="example_trace",
-    input={"started": True},
-) as root:
-    with root.start_as_current_observation(
-        as_type="agent",
-        name="planner_agent",
-        input={"goal": "Find capital of France"},
-    ) as agent_span:
-        agent_span.update(output={"status": "completed"})
 
-    with root.start_as_current_observation(
-        as_type="tool",
-        name="wiki_search",
-        input={"query": "capital of France"},
-    ) as tool_span:
-        tool_span.update(output={"hits": 3})
+#### Настройка:
+- Создайте аккаунт в Langfuse Cloud или запустите локально.
+- Получите API-ключи.
+- Интегрируйте базовое отслеживание в ваше приложение.
 
-    with root.start_as_current_observation(
-        as_type="generation",
-        name="llm_call",
-        model="gpt-4o-mini",
-        model_parameters={"temperature": "0.7"},
-        input={"prompt": "What is the capital of France?"},
-    ) as gen:
-        gen.update(
-            output="The capital of France is Paris.",
-            usage_details={
-                "prompt_tokens": 10,
-                "completion_tokens": 5,
-                "total_tokens": 15,
-            },
-        )
+### 📊 Этап 3: Инструментирование приложения.
 
-    with root.start_as_current_observation(
-        as_type="span",
-        name="error_occurred",
-        level="ERROR",
-        status_message="Connection timeout",
-        metadata={"error": "Connection timeout", "code": 500},
-    ) as error_span:
-        error_span.update(output={"retry": False})
-```
 
-![Example trace](screenshots/example_trace.png)
+#### Что нужно отслеживать:
 
-## Эксперимент 2: декоратор @observe
 
-Файл: `langfuse-demo/demo_observe.py`
+#### Обязательно:
 
-Сценарий демонстрирует трассировку функций через декоратор `@observe`. Трейс формируется автоматически, а вложенные шаги попадают в дерево.
+- Время выполнения операций.
+- Входные и выходные данные.
+- Использование токенов и стоимость.
 
-Пример кода:
+#### Дополнительно (в зависимости от типа приложения):
+- RAG: количество найденных документов, релевантность.
+- Суммаризация: длина исходного и итогового текста.
+- Чат-бот: длина контекста беседы.
 
-```python
-from langfuse import observe
+#### Дополнительные механизмы Langfuse:
+- Познакомьтеcь c концепцией datasets, сделать тестовый пример.
+- Создайте эксперимент с кастомным или готовым evaluator для своего кейса.
 
-@observe(name="process_data_decorated")
-def process_data_decorated(data):
-    result1 = step_one_decorated(data)
-    result2 = step_two_decorated(result1)
-    return {"final_result": result2}
+### 🧪 Этап 4: Тестирование и анализ.
+- Проведите несколько тестовых запросов, изучите метрики в Langfuse UI.
+- Документирование: Сделайте скриншоты и опишите результаты.
 
-@observe(name="step_one_decorated")
-def step_one_decorated(data):
-    return {**data, "step_one_processed": True}
+#### Вспомогательные материалы: 
+- https://langfuse.com/docs
 
-@observe(name="step_two_decorated")
-def step_two_decorated(data):
-    return {**data, "step_two_processed": True}
-```
+### Формат сдачи:
+Любой на выбор:
+- Github с приложением + локальным / облачным Langfuse.
+- Отдельный ipynb ноутбук с логикой вашего приложения и интеграцией туда Langfuse.
 
-![Decorated trace](screenshots/process_data_decorated.png)
+### Дополнительно нужно приложить скриншоты вашего интерфейса Langfuse со следующими сущностями:
+- traces (общий вид и один детальный трейс, в развернутом формате);
+- observation;
+- dashboards
+- llm-as-a-judge; *
+- annotations queue; *
+- созданный custom evaluator; *
 
-## Эксперимент 3: ручное логирование без декоратора
+\* - дополнительные пункты.
 
-Файл: `langfuse-demo/demo_observe.py`
+### Критерии оценки:
+Статус "Принято" состоит из следующих критериев:
+- Функциональность LLM-приложения: 30%
+- Корректная работа системы.
+- Качество ответов на вопросы.
+- Обработка различных типов запросов.
+- Стабильность работы приложения.
+- Интеграция и настройка Langfuse: 35%
+- Корректная настройка трассировки.
+- Использование spans и events.
+- Правильная передача метаданных.
+- Работа с callback handlers.
+- Работа с LLM as a judge, Human Annotations, поддержки. Отдельных user id для трейсинга, создание кастомных evaluator. *
+- Кастомизация под сценарий: 20%
+- Адаптация под выбранную предметную область.
+- Специфичная логика для сценария.
+- Анализ метрик и производительности: 15%
+- Использование Langfuse UI для анализа.
+- Интерпретация traces и spans.
+- Анализ времени ответа и стоимости.
 
-Сценарий строит трейс вручную через `start_as_current_observation` и `update`. На скриншоте видно два шага, вложенные в root span.
-
-Пример кода:
-
-```python
-def process_data_manual(data, trace_name, langfuse):
-    with langfuse.start_as_current_observation(
-        as_type="span",
-        name=trace_name,
-        input=data,
-    ) as root_span:
-        result1 = step_one_manual(data, langfuse)
-        result2 = step_two_manual(result1, langfuse)
-        root_span.update(output={"final_result": result2})
-        return {"final_result": result2}
-
-def step_one_manual(data, langfuse):
-    with langfuse.start_as_current_observation(
-        as_type="span",
-        name="step_one_manual",
-        input=data,
-    ) as span:
-        output = {**data, "step_one_processed": True}
-        span.update(output=output)
-        return output
-
-def step_two_manual(data, langfuse):
-    with langfuse.start_as_current_observation(
-        as_type="span",
-        name="step_two_manual",
-        input=data,
-    ) as span:
-        output = {**data, "step_two_processed": True}
-        span.update(output=output)
-        return output
-```
-
-![Manual trace](screenshots/process_data_manual.png)
-
-## Вывод
-
-Наиболее информативным выглядит `example_trace`, потому что в одном трейсе показаны все ключевые типы наблюдений (generation, embedding, agent, tool, retriever, guardrail), есть успешные и ошибочные ветки, а также таймлайн по шагам. Это дает наиболее полную картину поведения пайплайна и структуры трассировки по сравнению с минимальными сценариями. 
-НО(!) такой трейс сложнее использовать для точечного анализа затрат по вложенным шагам: например, если нужно получить стоимость одной конкретной генерации, а не общую стоимость всего запуска.
-
-## Примечания
-
-- `get_client()` использует переменные окружения `LANGFUSE_*`.
-- Для короткоживущих скриптов важно вызывать `flush()` и `shutdown()`.
-
-См. результаты в дашборде Langfuse: https://cloud.langfuse.com
+### Компетенции:
+Интегрировать LLM в прикладные системы, создавая защищённые и адаптированные сценарии взаимодействия с внешними источниками знаний
+- знать инструменты, которые упрощают создание приложений на базе LLM

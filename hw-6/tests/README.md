@@ -5,7 +5,7 @@
 ## Запуск тестов
 
 ```bash
-cd hw-5-6/tests
+cd hw-6/tests
 python run_tests.py
 ```
 

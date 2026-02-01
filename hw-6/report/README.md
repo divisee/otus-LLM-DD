@@ -80,7 +80,7 @@ docker run -d \
 Сборка и запуск API сервиса в контейнере:
 
 ```bash
-cd hw-5-6
+cd hw-6
 
 # Сборка образа
 docker build -t movie-agent .
@@ -170,14 +170,14 @@ langfuse:
 
 ### Векторизация датасета:
 
-- Проверяем наличие файла `data_films.csv` в `hw-5-6/data/`.
+- Проверяем наличие файла `data_films.csv` в `hw-6/data/`.
 - Проверяем наличие https://ollama.com/library/embeddinggemma в ollama локально 
 ```bash
 ollama list
 ```
 - Запускаем импорт, эмбеддинги считаются по полю  `Description Kinopoisk`.
 ```bash
-python hw-5-6/scripts/ingest_movies.py --config hw-5-6/config.yaml
+python hw-6/scripts/ingest_movies.py --config hw-6/config.yaml
 ```
 - В Qdrant сохраняем payload с нужными полями из датасета.
 - Прогресс идет одной строкой в процентах по батчам.
@@ -231,7 +231,7 @@ python hw-5-6/scripts/ingest_movies.py --config hw-5-6/config.yaml
 ### Запуск пайплайна
 
 ```bash
-cd hw-5-6
+cd hw-6
 python rag_graph.py --config config.yaml --query "Найди фильм про мальчика с волшебными силами"
 ```
 
@@ -322,7 +322,7 @@ Movie Agent — это **мультиагентная система** на ба
 ### Запуск API сервиса
 
 ```bash
-cd hw-5-6
+cd hw-6
 uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 ```
 
