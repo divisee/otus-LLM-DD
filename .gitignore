@@ -15,7 +15,7 @@ Thumbs.db
 
 # Config files with secrets
 config.yaml
-hw-5-6/config.yaml
+hw-6/config.yaml
 **/config.yaml
 
 # Duplicate notebooks
