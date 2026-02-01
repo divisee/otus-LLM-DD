@@ -1,0 +1,4 @@
+langfuse:
+  secret_key: "sk-lf-..."
+  public_key: "pk-lf-..."
+  base_url: "https://cloud.langfuse.com"
