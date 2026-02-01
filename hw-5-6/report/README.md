@@ -208,9 +208,9 @@ python hw-5-6/scripts/ingest_movies.py --config hw-5-6/config.yaml
 | Агент | Файл | Промпт | Что делает |
 |-------|------|--------|------------|
 | **AnalyzerAgent** | `agents/AnalyzerAgent.py` | `ANALYZER_PROMPT` из `agents/prompts.py` | Анализирует запрос пользователя, очищает его от приветствий и вежливых фраз, оставляя только суть по фильмам, и решает: нужен ли RAG (поиск в локальной базе) и/или веб-поиск (Tavily). Возвращает JSON с полями `cleaned_query`, `need_rag`, `need_search`. |
-| **GatherAgent** | `agents/GatherAgent.py` | `GATHER_SEARCH_PROMPT` из `agents/prompts.py` | Собирает данные: если `need_rag=true` — ищет в Qdrant по эмбеддингам, если `need_search=true` — формирует поисковый запрос и ищет через Tavily. |
-| **AnswerAgent** | `agents/AnswerAgent.py` | `ANSWER_PROMPT` из `agents/prompts.py` | Формирует финальный ответ на основе собранных данных (RAG + веб). Возвращает JSON с полем `answer`, списком источников и допущениями. |
-| **ReviewAgent** | `agents/ReviewAgent.py` | `REVIEW_PROMPT` из `agents/prompts.py` | Проверяет качество ответа. Если данных мало — возвращает `refine_needed=true` с уточняющим запросом для повторного сбора (макс. 3 итерации). |
+| **GatherAgent** | `agents/GatherAgent.py` | `GATHER_SEARCH_PROMPT` из `agents/prompts.py` | Собирает данные: всегда делает RAG по `effective_query`, и если нужно — веб-поиск по тому же `effective_query`, затем очищает результаты веб-поиска с помощью LLM. |
+| **AnswerAgent** | `agents/AnswerAgent.py` | `ANSWER_PROMPT` из `agents/prompts.py` | Формирует финальный ответ на основе собранных данных (RAG + веб). Возвращает JSON с полем `answer`, списком источников и допущениями. Накопляет ответы и возвращает наиболее проработанный (последний). |
+| **ReviewAgent** | `agents/ReviewAgent.py` | `REVIEW_PROMPT` из `agents/prompts.py` | Проверяет качество ответа. Если данных мало — возвращает `refine_needed=true` с перефразированным запросом (тот же смысл, другая формулировка). Принудительно уточняет, если веб-поиск не выполнен. |
 
 ### Инструменты (Tools)
 
@@ -224,9 +224,9 @@ python hw-5-6/scripts/ingest_movies.py --config hw-5-6/config.yaml
 Все промпты хранятся в файле `agents/prompts.py`:
 
 - `ANALYZER_PROMPT` — инструкции для анализа запроса
-- `GATHER_SEARCH_PROMPT` — инструкции для формирования поискового запроса
+- `GATHER_SEARCH_PROMPT` — инструкции для анализа и очистки результатов веб-поиска
 - `ANSWER_PROMPT` — инструкции для генерации ответа (включая правило не выдумывать фильмы)
-- `REVIEW_PROMPT` — инструкции для проверки качества ответа
+- `REVIEW_PROMPT` — инструкции для проверки качества ответа и перефразировки запроса
 
 ### Запуск пайплайна
 
@@ -252,6 +252,12 @@ Langfuse поддерживает два основных подхода к ло
 #### Единый трейс пайплайна
 
 ![Единый трейс пайплайна](./screenshots/common_pipeline_traces_langfuse.png)
+
+#### Детальные трейсы с токенами и их стоимостью
+
+Также отображается стоимость токенов, их количество, время работы каждого агента и последовательность вызовов (пример с RAG без уточнений).
+
+![Детальные трейсы с стоимостью](./screenshots/traces_with_cost_langfuse.png)
 
 | Тип | Где | Что |
 |-----|-----|-----|

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from typing import Any, Dict
+import json
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
@@ -58,56 +59,48 @@ class GatherAgent:
                 debug.append(f"Gather: RAG retrieved {len(rag_docs)} docs.")
 
             if need_search and not web_search_done:
-                start_time = time.time()
-                resp = self.llm.invoke(
-                    [
+                search_res = self.web_tool.invoke({"query": effective_query})
+                raw_web_results = search_res.get("results", [])
+
+                if raw_web_results:
+                    raw_results_text = "\n\n".join([
+                        f"Title: {r.get('title', '')}\nURL: {r.get('url', '')}\nContent: {r.get('content', '')[:500]}"
+                        for r in raw_web_results
+                    ])
+
+                    start_time = time.time()
+                    resp = self.llm.invoke([
                         SystemMessage(content=GATHER_SEARCH_PROMPT),
-                        HumanMessage(content=effective_query),
-                    ]
-                )
-                latency = time.time() - start_time
+                        HumanMessage(content=f"Запрос: {effective_query}\nРезультаты:\n{raw_results_text}"),
+                    ])
+                    latency = time.time() - start_time
 
-                if self.langfuse:
-                    generation_context = self.langfuse.start_observation(
-                        as_type="generation",
-                        name="gather_search_query_llm",
-                        model=self.llm.model_name,
-                        input=f"System: {GATHER_SEARCH_PROMPT}\nUser: {effective_query}",
-                    )
-                    generation_context.update(output=resp.content, metadata={"latency_s": round(latency, 2)})
-                    generation_context.end()
+                    if self.langfuse:
+                        generation_context = self.langfuse.start_observation(
+                            as_type="generation",
+                            name="gather_clean_web_results_llm",
+                            model=self.llm.model_name,
+                            input=f"System: {GATHER_SEARCH_PROMPT}\nUser: Запрос: {effective_query}\nРезультаты:\n{raw_results_text}",
+                        )
+                        generation_context.update(output=resp.content, metadata={"latency_s": round(latency, 2)})
+                        generation_context.end()
 
-                search_query = resp.content.strip()
-                debug.append(f"Gather: built search query: {search_query}")
-
-                if self.langfuse:
-                    tavily_span_context = self.langfuse.start_observation(
-                        as_type="span",
-                        name="tavily_search",
-                        input={"query": search_query},
-                    )
+                    try:
+                        web_results = json.loads(resp.content)
+                        debug.append(f"Gather: cleaned web results, got {len(web_results)} items.")
+                    except Exception as e:
+                        debug.append(f"Gather: failed to parse cleaned web results, using raw. Error: {e}")
+                        web_results = raw_web_results
                 else:
-                    tavily_span_context = None
-
-                search_res = self.web_tool.invoke({"query": search_query})
-                web_results = search_res.get("results", [])
-
-                if tavily_span_context:
-                    tavily_span_context.update(output={
-                        "results_count": len(web_results),
-                        "results": [
-                            {"title": r.get("title"), "url": r.get("url"), "content": r.get("content", "")[:500]}
-                            for r in web_results
-                        ],
-                    })
-                    tavily_span_context.end()
+                    web_results = []
+                    debug.append("Gather: no web results.")
 
                 for res in web_results:
                     url = res.get("url")
                     if url and url not in citations:
                         citations.append(url)
 
-                debug.append(f"Gather: Tavily returned {len(web_results)} results and {len(citations)} urls.")
+                debug.append(f"Gather: final web results {len(web_results)} items, citations {len(citations)}.")
                 state["web_search_done"] = True
             else:
                 debug.append("Gather: search disabled or already done.")
