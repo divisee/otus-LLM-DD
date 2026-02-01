@@ -53,6 +53,7 @@ class RagRetriever:
             collection_name=self.collection_name,
             query=vec,
             limit=top_k,
+            score_threshold=0.3,
         )
 
         docs: List[Dict[str, Any]] = []

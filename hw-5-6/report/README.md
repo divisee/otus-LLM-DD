@@ -203,12 +203,14 @@ python hw-5-6/scripts/ingest_movies.py --config hw-5-6/config.yaml
 
 ### Агенты
 
+Каждый агент реализован как класс с методом `__call__`, принимающий состояние пайплайна и возвращающий обновленное состояние. Агенты инициализируются с необходимыми зависимостями (LLM, инструменты, конфиг) в конструкторе `__init__`.
+
 | Агент | Файл | Промпт | Что делает |
 |-------|------|--------|------------|
-| **AnalyzerAgent** | `rag_graph.py` | `ANALYZER_PROMPT` из `prompts.py` | Анализирует запрос пользователя, очищает его от приветствий и вежливых фраз, оставляя только суть по фильмам, и решает: нужен ли RAG (поиск в локальной базе) и/или веб-поиск (Tavily). Возвращает JSON с полями `cleaned_query`, `need_rag`, `need_search`. |
-| **GatherAgent** | `rag_graph.py` | `GATHER_SEARCH_PROMPT` из `prompts.py` | Собирает данные: если `need_rag=true` — ищет в Qdrant по эмбеддингам, если `need_search=true` — формирует поисковый запрос и ищет через Tavily. |
-| **AnswerAgent** | `rag_graph.py` | `ANSWER_PROMPT` из `prompts.py` | Формирует финальный ответ на основе собранных данных (RAG + веб). Возвращает JSON с полем `answer`, списком источников и допущениями. |
-| **ReviewAgent** | `rag_graph.py` | `REVIEW_PROMPT` из `prompts.py` | Проверяет качество ответа. Если данных мало — возвращает `refine_needed=true` с уточняющим запросом для повторного сбора (макс. 3 итерации). |
+| **AnalyzerAgent** | `agents/AnalyzerAgent.py` | `ANALYZER_PROMPT` из `agents/prompts.py` | Анализирует запрос пользователя, очищает его от приветствий и вежливых фраз, оставляя только суть по фильмам, и решает: нужен ли RAG (поиск в локальной базе) и/или веб-поиск (Tavily). Возвращает JSON с полями `cleaned_query`, `need_rag`, `need_search`. |
+| **GatherAgent** | `agents/GatherAgent.py` | `GATHER_SEARCH_PROMPT` из `agents/prompts.py` | Собирает данные: если `need_rag=true` — ищет в Qdrant по эмбеддингам, если `need_search=true` — формирует поисковый запрос и ищет через Tavily. |
+| **AnswerAgent** | `agents/AnswerAgent.py` | `ANSWER_PROMPT` из `agents/prompts.py` | Формирует финальный ответ на основе собранных данных (RAG + веб). Возвращает JSON с полем `answer`, списком источников и допущениями. |
+| **ReviewAgent** | `agents/ReviewAgent.py` | `REVIEW_PROMPT` из `agents/prompts.py` | Проверяет качество ответа. Если данных мало — возвращает `refine_needed=true` с уточняющим запросом для повторного сбора (макс. 3 итерации). |
 
 ### Инструменты (Tools)
 
@@ -219,7 +221,7 @@ python hw-5-6/scripts/ingest_movies.py --config hw-5-6/config.yaml
 
 ### Промпты
 
-Все промпты хранятся в файле `prompts.py`:
+Все промпты хранятся в файле `agents/prompts.py`:
 
 - `ANALYZER_PROMPT` — инструкции для анализа запроса
 - `GATHER_SEARCH_PROMPT` — инструкции для формирования поискового запроса
@@ -241,7 +243,7 @@ Langfuse поддерживает два основных подхода к ло
 
 2. **Единый трейс пайплайна**: Весь запрос логируется как один большой трейс, внутри которого вложены все операции. Это предпочтительно для оценки общей производительности, последовательности шагов и стоимости запроса.
 
-Используем второй подход, где весь пайплайн — это один трейс с вложенными спанами.
+Мы используем первый подход с детальными трейсами, чтобы лучше оценивать задержки и стоимость каждого запроса.
 
 #### Детальные трейсы
 
@@ -254,7 +256,7 @@ Langfuse поддерживает два основных подхода к ло
 | Тип | Где | Что |
 |-----|-----|-----|
 | Trace | `main()` | Полный путь выполнения запроса с тегами `movie-agent`, `rag` |
-| Spans | Каждый агент | `analyzer`, `gatherer`, `answerer`, `reviewer`, `movie_agent_run` |
+| Generations | Агенты | `analyzer`, `gatherer`, `answerer`, `reviewer` |
 | Spans (tools) | `tools_rag.py` | `rag_retrieve`, `ollama_embed`, `qdrant_search` |
 | Spans (tools) | `tools_tavily.py` | `tavily_search` |
 | Generations | LLM вызовы | `analyzer_llm`, `gather_search_query_llm`, `answerer_llm`, `reviewer_llm` |
