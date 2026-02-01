@@ -30,6 +30,10 @@
 
 ![Traces list](screenshots/traces.png)
 
+Начальная страница Langfuse (дашборд с графиками и диаграммами - трейсов, цен и scores):
+
+![Langfuse dashboard](screenshots/dashboard.png)
+
 ## Эксперимент 1: полный набор типов наблюдений
 
 Файл: `hw-5/demo.py`
