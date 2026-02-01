@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from config_utils import load_config
-from rag_graph import build_graph, make_llm
+from build_graph import build_graph, make_llm, langfuse
 from state import User_State
 from tools_rag import RagRetriever, make_rag_tool
 from tools_tavily import make_web_search_tool
@@ -24,7 +24,7 @@ config = load_config(CONFIG_PATH)
 
 # Инициализация компонентов
 llm = make_llm(config)
-rag_retriever = RagRetriever(CONFIG_PATH)
+rag_retriever = RagRetriever(CONFIG_PATH, langfuse=langfuse)
 rag_tool = make_rag_tool(rag_retriever)
 tavily_key = config.get("tavily", {}).get("api_key") or os.getenv("TAVILY_API_KEY")
 web_tool = make_web_search_tool(tavily_key)
@@ -92,7 +92,14 @@ async def query_movies(request: QueryRequest):
 
         run_config = {"configurable": {"thread_id": request.thread_id}}
 
-        result = graph.invoke(initial_state, config=run_config)  # type: ignore[arg-type]
+        with langfuse.start_as_current_observation(
+            as_type="span",
+            name="movie_agent_pipeline",
+            input={"query": request.query},
+        ) as root:
+            root.update_trace(name="movie_agent_pipeline", input={"query": request.query})
+            result = graph.invoke(initial_state, config=run_config)  # type: ignore[arg-type]
+            root.update(output={"status": result.get("status", "done")})
 
         return QueryResponse(
             answer=result.get("itinerary", {}).get("answer", "Не удалось получить ответ"),

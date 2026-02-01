@@ -27,49 +27,90 @@ class ReviewAgent:
         refine_query = None
 
         try:
-            start_time = time.time()
-            react_resp = self.llm.invoke([
-                SystemMessage(content=REVIEW_PROMPT),
-                HumanMessage(content=f"Запрос пользователя:\n{user_request}"),
-                HumanMessage(content=f"Текущий JSON-ответ:\n{json.dumps({'itinerary': itinerary, 'assumptions': assumptions}, ensure_ascii=False)}"),
-            ])
-            latency = time.time() - start_time
-
             if self.langfuse:
-                generation_context = self.langfuse.start_observation(
-                    as_type="generation",
-                    name="reviewer_llm",
-                    model=self.llm.model_name,
-                    input=f"System: {REVIEW_PROMPT}\nUser: Запрос пользователя:\n{user_request}\nТекущий JSON-ответ:\n{json.dumps({'itinerary': itinerary, 'assumptions': assumptions}, ensure_ascii=False)}",
-                )
-                generation_context.update(output=react_resp.content, metadata={"latency_s": round(latency, 2)})
-                generation_context.end()
+                with self.langfuse.start_as_current_observation(
+                    as_type="agent",
+                    name="review_agent",
+                    input={"user_request": user_request, "iteration": refine_iterations},
+                ) as agent_span:
+                    agent_span.update_trace(name="movie_agent_pipeline")
+                    start_time = time.time()
+                    react_resp = self.llm.invoke([
+                        SystemMessage(content=REVIEW_PROMPT),
+                        HumanMessage(content=f"Запрос пользователя:\n{user_request}"),
+                        HumanMessage(content=f"Текущий JSON-ответ:\n{json.dumps({'itinerary': itinerary, 'assumptions': assumptions}, ensure_ascii=False)}"),
+                    ])
+                    latency = time.time() - start_time
 
-            try:
-                react_data = json.loads(react_resp.content)
-                refine_needed = bool(react_data.get("refine_needed", False))
-                refine_query_raw = react_data.get("refine_query") or ""
-                refine_query = refine_query_raw.strip() or None
-            except Exception as e:
-                if self.langfuse:
-                    self.langfuse.start_observation(name="reviewer_json_error", as_type="span").update(input={"error": str(e)}).end()
-                debug.append("Reviewer: failed to parse refine JSON, assuming refine_needed=false.")
-                refine_needed = False
-                refine_query = None
+                    with agent_span.start_as_current_observation(
+                        as_type="generation",
+                        name="reviewer_llm",
+                        model=self.llm.model_name,
+                        input=f"System: {REVIEW_PROMPT}\nUser: Запрос пользователя:\n{user_request}\nТекущий JSON-ответ:\n{json.dumps({'itinerary': itinerary, 'assumptions': assumptions}, ensure_ascii=False)}",
+                    ) as gen:
+                        gen.update(output=react_resp.content, metadata={"latency_s": round(latency, 2)})
 
-            if refine_needed and refine_iterations < max_iterations and refine_query:
-                state["refine_needed"] = True
-                state["refine_query"] = refine_query
-                state["refine_iterations"] = refine_iterations + 1
-                state["status"] = "gathering"
-                debug.append(f"Reviewer: requesting another gather iteration (iteration #{state['refine_iterations']}, query='{refine_query}').")
+                    try:
+                        react_data = json.loads(react_resp.content)
+                        refine_needed = bool(react_data.get("refine_needed", False))
+                        refine_query_raw = react_data.get("refine_query") or ""
+                        refine_query = refine_query_raw.strip() or None
+                    except Exception as e:
+                        with agent_span.start_as_current_observation(
+                            as_type="span",
+                            name="reviewer_json_error",
+                            input={"error": str(e)},
+                        ) as error_span:
+                            error_span.update(output={"raw_content": react_resp.content[:500]})
+                        debug.append("Reviewer: failed to parse refine JSON, assuming refine_needed=false.")
+                        refine_needed = False
+                        refine_query = None
+
+                    if refine_needed and refine_iterations < max_iterations and refine_query:
+                        state["refine_needed"] = True
+                        state["refine_query"] = refine_query
+                        state["refine_iterations"] = refine_iterations + 1
+                        state["status"] = "gathering"
+                        debug.append(f"Reviewer: requesting another gather iteration (iteration #{state['refine_iterations']}, query='{refine_query}').")
+                    else:
+                        if refine_needed and refine_iterations >= max_iterations:
+                            debug.append("Reviewer: refine limit reached, stopping.")
+                        state["refine_needed"] = False
+                        state["refine_query"] = None
+                        state["status"] = "done"
+                        debug.append("Reviewer: done.")
+
+                    agent_span.update(output={"refine_needed": refine_needed})
             else:
-                if refine_needed and refine_iterations >= max_iterations:
-                    debug.append("Reviewer: refine limit reached, stopping.")
-                state["refine_needed"] = False
-                state["refine_query"] = None
-                state["status"] = "done"
-                debug.append("Reviewer: done.")
+                react_resp = self.llm.invoke([
+                    SystemMessage(content=REVIEW_PROMPT),
+                    HumanMessage(content=f"Запрос пользователя:\n{user_request}"),
+                    HumanMessage(content=f"Текущий JSON-ответ:\n{json.dumps({'itinerary': itinerary, 'assumptions': assumptions}, ensure_ascii=False)}"),
+                ])
+
+                try:
+                    react_data = json.loads(react_resp.content)
+                    refine_needed = bool(react_data.get("refine_needed", False))
+                    refine_query_raw = react_data.get("refine_query") or ""
+                    refine_query = refine_query_raw.strip() or None
+                except Exception:
+                    debug.append("Reviewer: failed to parse refine JSON, assuming refine_needed=false.")
+                    refine_needed = False
+                    refine_query = None
+
+                if refine_needed and refine_iterations < max_iterations and refine_query:
+                    state["refine_needed"] = True
+                    state["refine_query"] = refine_query
+                    state["refine_iterations"] = refine_iterations + 1
+                    state["status"] = "gathering"
+                    debug.append(f"Reviewer: requesting another gather iteration (iteration #{state['refine_iterations']}, query='{refine_query}').")
+                else:
+                    if refine_needed and refine_iterations >= max_iterations:
+                        debug.append("Reviewer: refine limit reached, stopping.")
+                    state["refine_needed"] = False
+                    state["refine_query"] = None
+                    state["status"] = "done"
+                    debug.append("Reviewer: done.")
         except Exception:
             pass
 

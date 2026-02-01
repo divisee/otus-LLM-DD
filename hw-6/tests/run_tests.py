@@ -51,7 +51,7 @@ def run_test(query: str, test_name: str) -> dict:
     print("=" * 60)
 
     config_path = Path(__file__).parent.parent / "config.yaml"
-    script_path = Path(__file__).parent.parent / "rag_graph.py"
+    script_path = Path(__file__).parent.parent / "build_graph.py"
 
     result = subprocess.run(
         [sys.executable, str(script_path), "--config", str(config_path), "--query", query],

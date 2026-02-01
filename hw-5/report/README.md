@@ -7,7 +7,6 @@
 1. Установите зависимости:
 
    ```bash
-   cd ..
    pip install -r requirements.txt
    ```
 
@@ -22,7 +21,6 @@
 3. Запустите нужный эксперимент:
 
    ```bash
-   cd ..
    python demo.py
    python demo_observe.py
    ```

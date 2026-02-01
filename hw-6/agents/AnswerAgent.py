@@ -31,38 +31,68 @@ class AnswerAgent:
         web_text = "\n\n---\n\n".join(web_text_chunks) or "Веб-результаты отсутствуют."
 
         try:
-            start_time = time.time()
-            resp = self.llm.invoke([
-                SystemMessage(content=ANSWER_PROMPT),
-                HumanMessage(content=f"Запрос пользователя:\n{user_request}"),
-                HumanMessage(content=f"Локальные данные (RAG):\n{rag_text}"),
-                HumanMessage(content=f"Результаты веб-поиска (Tavily):\n{web_text}"),
-                HumanMessage(content=f"Доступные URL-источники:\n{citations}"),
-            ])
-            latency = time.time() - start_time
-
             if self.langfuse:
-                generation_context = self.langfuse.start_observation(
-                    as_type="generation",
-                    name="answerer_llm",
-                    model=self.llm.model_name,
-                    input=f"System: {ANSWER_PROMPT}\nUser: Запрос пользователя:\n{user_request}\nЛокальные данные (RAG):\n{rag_text}\nРезультаты веб-поиска (Tavily):\n{web_text}\nДоступные URL-источники:\n{citations}",
-                )
-                generation_context.update(output=resp.content, metadata={"latency_s": round(latency, 2)})
-                generation_context.end()
+                with self.langfuse.start_as_current_observation(
+                    as_type="agent",
+                    name="answer_agent",
+                    input={"user_request": user_request},
+                ) as agent_span:
+                    agent_span.update_trace(name="movie_agent_pipeline")
+                    start_time = time.time()
+                    resp = self.llm.invoke([
+                        SystemMessage(content=ANSWER_PROMPT),
+                        HumanMessage(content=f"Запрос пользователя:\n{user_request}"),
+                        HumanMessage(content=f"Локальные данные (RAG):\n{rag_text}"),
+                        HumanMessage(content=f"Результаты веб-поиска (Tavily):\n{web_text}"),
+                        HumanMessage(content=f"Доступные URL-источники:\n{citations}"),
+                    ])
+                    latency = time.time() - start_time
 
-            try:
-                data = json.loads(resp.content)
-                debug.append("Answerer: parsed JSON successfully.")
-            except Exception as e:
-                if self.langfuse:
-                    self.langfuse.start_observation(name="answerer_json_error", as_type="span").update(input={"error": str(e), "raw_content": resp.content[:500]}).end()
-                data = {
-                    "answer": "Не удалось корректно сформировать JSON-ответ.",
-                    "sources": citations,
-                    "assumptions": ["Не удалось распарсить JSON от LLM, использован fallback-ответ."],
-                }
-                debug.append("Answerer: invalid JSON, fallback used.")
+                    with agent_span.start_as_current_observation(
+                        as_type="generation",
+                        name="answerer_llm",
+                        model=self.llm.model_name,
+                        input=f"System: {ANSWER_PROMPT}\nUser: Запрос пользователя:\n{user_request}\nЛокальные данные (RAG):\n{rag_text}\nРезультаты веб-поиска (Tavily):\n{web_text}\nДоступные URL-источники:\n{citations}",
+                    ) as gen:
+                        gen.update(output=resp.content, metadata={"latency_s": round(latency, 2)})
+
+                    try:
+                        data = json.loads(resp.content)
+                        debug.append("Answerer: parsed JSON successfully.")
+                    except Exception as e:
+                        with agent_span.start_as_current_observation(
+                            as_type="span",
+                            name="answerer_json_error",
+                            input={"error": str(e)},
+                        ) as error_span:
+                            error_span.update(output={"raw_content": resp.content[:500]})
+                        data = {
+                            "answer": "Не удалось корректно сформировать JSON-ответ.",
+                            "sources": citations,
+                            "assumptions": ["Не удалось распарсить JSON от LLM, использован fallback-ответ."],
+                        }
+                        debug.append("Answerer: invalid JSON, fallback used.")
+
+                    agent_span.update(output={"answer_len": len(data.get("answer", ""))})
+            else:
+                resp = self.llm.invoke([
+                    SystemMessage(content=ANSWER_PROMPT),
+                    HumanMessage(content=f"Запрос пользователя:\n{user_request}"),
+                    HumanMessage(content=f"Локальные данные (RAG):\n{rag_text}"),
+                    HumanMessage(content=f"Результаты веб-поиска (Tavily):\n{web_text}"),
+                    HumanMessage(content=f"Доступные URL-источники:\n{citations}"),
+                ])
+
+                try:
+                    data = json.loads(resp.content)
+                    debug.append("Answerer: parsed JSON successfully.")
+                except Exception:
+                    data = {
+                        "answer": "Не удалось корректно сформировать JSON-ответ.",
+                        "sources": citations,
+                        "assumptions": ["Не удалось распарсить JSON от LLM, использован fallback-ответ."],
+                    }
+                    debug.append("Answerer: invalid JSON, fallback used.")
         except Exception:
             pass
 

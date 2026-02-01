@@ -22,19 +22,24 @@ from agents.AnswerAgent import AnswerAgent
 from agents.ReviewAgent import ReviewAgent
 
 _config = load_config(Path("config.yaml"))
-_langfuse_cfg = _config.get("langfuse", {})
 
-from langfuse import get_client, Langfuse
+from dotenv import load_dotenv
+from langfuse import get_client
 
-try:
-    langfuse = Langfuse(
-        public_key=_langfuse_cfg["public_key"],
-        secret_key=_langfuse_cfg["secret_key"],
-        host=_langfuse_cfg["base_url"]
+# Инициализация Langfuse клиента через переменные окружения
+load_dotenv()
+
+required_vars = ["LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_BASE_URL"]
+missing = [key for key in required_vars if not os.getenv(key)]
+if missing:
+    print(
+        "Ошибка: не найдены переменные окружения: "
+        + ", ".join(missing)
+        + ". Заполните hw-5/.env или экспортируйте их в окружение."
     )
-except Exception as e:
-    print(f"Langfuse initialization failed: {e}. Continuing without logging.")
-    langfuse = None
+    raise SystemExit(1)
+
+langfuse = get_client()
 
 
 def build_graph(llm, rag_tool, web_tool):
@@ -94,7 +99,7 @@ def main() -> None:
     config = load_config(args.config)
 
     llm = make_llm(config)
-    rag_retriever = RagRetriever(args.config)
+    rag_retriever = RagRetriever(args.config, langfuse=langfuse)
     rag_tool = make_rag_tool(rag_retriever)
     tavily_key = config.get("tavily", {}).get("api_key") or os.getenv("TAVILY_API_KEY")
     web_tool = make_web_search_tool(tavily_key)
@@ -112,8 +117,15 @@ def main() -> None:
     run_config = {"configurable": {"thread_id": "default"}}
 
     start_time = time.time()
-    result = graph.invoke(initial_state, config=run_config)
-    total_latency = time.time() - start_time
+    with langfuse.start_as_current_observation(
+        as_type="span",
+        name="movie_agent_pipeline",
+        input={"query": args.query},
+    ) as root:
+        root.update_trace(name="movie_agent_pipeline", input={"query": args.query})
+        result = graph.invoke(initial_state, config=run_config)
+        total_latency = time.time() - start_time
+        root.update(output={"status": result.get("status", "done")}, metadata={"latency_s": round(total_latency, 2)})
 
     print("=== DEBUG NOTES ===")
     for note in result.get("debug_notes", []):
@@ -123,11 +135,10 @@ def main() -> None:
     final_answer = answers[-1] if answers else result.get("itinerary", {}).get("answer", "")
     print(json.dumps({"answer": final_answer}, ensure_ascii=False, indent=2))
 
-    if langfuse:
-        try:
-            langfuse.flush()
-        except Exception as e:
-            print(f"Langfuse flush failed: {e}")
+    try:
+        langfuse.flush()
+    except Exception as e:
+        print(f"Langfuse flush failed: {e}")
 
 
 if __name__ == "__main__":

@@ -232,10 +232,22 @@ python hw-6/scripts/ingest_movies.py --config hw-6/config.yaml
 
 ```bash
 cd hw-6
-python rag_graph.py --config config.yaml --query "Найди фильм про мальчика с волшебными силами"
+python build_graph.py --config config.yaml --query "Найди фильм про мальчика с волшебными силами"
 ```
 
 ## 4) Логирование в Langfuse
+
+### Инициализация Langfuse (через переменные окружения)
+
+```python
+from dotenv import load_dotenv
+from langfuse import get_client
+
+# Инициализация Langfuse клиента через переменные окружения
+load_dotenv()
+
+langfuse = get_client()
+```
 
 Langfuse поддерживает два основных подхода к логированию:
 
@@ -243,7 +255,7 @@ Langfuse поддерживает два основных подхода к ло
 
 2. **Единый трейс пайплайна**: Весь запрос логируется как один большой трейс, внутри которого вложены все операции. Это предпочтительно для оценки общей производительности, последовательности шагов и стоимости запроса.
 
-Используется первый подход с детальными трейсами, чтобы лучше оценивать задержки и стоимость каждого запроса.
+Используется единый трейс пайплайна, чтобы видеть все операции и общий граф выполнения в одном дереве, а также проще сопоставлять шаги агентов с итоговым ответом.
 
 #### Детальные трейсы
 
@@ -259,15 +271,28 @@ Langfuse поддерживает два основных подхода к ло
 
 ![Детальные трейсы с стоимостью](./screenshots/traces_with_cost_langfuse.png)
 
+### Полный пайплайн со всеми операциями
+Фиксируем полный пайплайн со всеми операциями и итоговым графом, чтобы видеть цепочку вызовов агентов, инструменты, эмбеддинги и ретривер в одном дереве.
+
+![Полный пайплайн](./screenshots/detailed_traces_langfuse.png)
+
+#### Пайплайн без доуточнений (1 итерация)
+
+![Pipeline 1 iteration](./screenshots/movie_agent_pipeline_1iteration.png)
+
+#### Пайплайн с доуточнениями (3 итерации)
+
+![Pipeline 3 iterations](./screenshots/movie_agent_pipeline_3iterations.png)
+
 | Тип | Где | Что |
 |-----|-----|-----|
-| Trace | `main()` | Полный путь выполнения запроса с тегами `movie-agent`, `rag` |
-| Generations | Агенты | `analyzer`, `gatherer`, `answerer`, `reviewer` |
-| Spans (tools) | `tools_rag.py` | `rag_retrieve`, `ollama_embed`, `qdrant_search` |
-| Spans (tools) | `tools_tavily.py` | `tavily_search` |
-| Generations | LLM вызовы | `analyzer_llm`, `gather_search_query_llm`, `answerer_llm`, `reviewer_llm` |
-| Spans | Ошибки | `analyzer_error`, `answerer_json_error`, `reviewer_json_error`, `tavily_error` |
-| Scores | Метрики | `pipeline_latency`, `rag_top_score` |
+| Span (root) | `build_graph.py`, `api.py` | `movie_agent_pipeline` — единый трейс пайплайна |
+| Agent | `agents/AnalyzerAgent.py`, `agents/GatherAgent.py`, `agents/AnswerAgent.py`, `agents/ReviewAgent.py` | `analyzer_agent`, `gather_agent`, `answer_agent`, `review_agent` |
+| Generation | LLM вызовы агентов | `analyzer_llm`, `gather_clean_web_results_llm`, `answerer_llm`, `reviewer_llm` |
+| Tool | `agents/GatherAgent.py` | `tavily_search` — веб-поиск через Tavily |
+| Retriever | `agents/GatherAgent.py`, `tools_rag.py` | `vector_retriever` — извлечение из Qdrant |
+| Embedding | `tools_rag.py` | `embed_query` — эмбеддинг запроса через Ollama |
+| Span (errors) | `agents/AnswerAgent.py`, `agents/ReviewAgent.py` | `answerer_json_error`, `reviewer_json_error` |
 
 ## 5) Примеры работы пайплайна
 

@@ -11,11 +11,36 @@ from config_utils import load_config
 
 
 class OllamaEmbedder:
-    def __init__(self, base_url: str, model: str) -> None:
+    def __init__(self, base_url: str, model: str, langfuse=None) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
+        self.langfuse = langfuse
 
     def embed_query(self, text: str) -> List[float]:
+        if self.langfuse:
+            with self.langfuse.start_as_current_observation(
+                as_type="embedding",
+                name="embed_query",
+                model=self.model,
+                input={"text": text},
+            ) as emb_span:
+                emb_span.update_trace(name="movie_agent_pipeline")
+                response = requests.post(
+                    f"{self.base_url}/api/embed",
+                    json={"model": self.model, "input": text},
+                    timeout=300,
+                )
+                response.raise_for_status()
+                data = response.json()
+
+                if "embedding" in data:
+                    emb_span.update(output={"vector_len": len(data["embedding"])})
+                    return data["embedding"]
+                if "embeddings" in data and data["embeddings"]:
+                    emb_span.update(output={"vector_len": len(data["embeddings"][0])})
+                    return data["embeddings"][0]
+                raise ValueError("Unexpected Ollama embed response format")
+
         response = requests.post(
             f"{self.base_url}/api/embed",
             json={"model": self.model, "input": text},
@@ -32,10 +57,11 @@ class OllamaEmbedder:
 
 
 class RagRetriever:
-    def __init__(self, config_path) -> None:
+    def __init__(self, config_path, langfuse=None) -> None:
         config = load_config(config_path)
         qdrant_cfg = config["qdrant"]
         ollama_cfg = config["ollama"]
+        self.langfuse = langfuse
 
         self.collection_name = qdrant_cfg["collection_name"]
         self.client = QdrantClient(
@@ -45,16 +71,33 @@ class RagRetriever:
         self.embedder = OllamaEmbedder(
             base_url=ollama_cfg["base_url"],
             model=ollama_cfg["embedding_model"],
+            langfuse=langfuse,
         )
 
     def retrieve(self, query: str, top_k: int = 10) -> List[Dict[str, Any]]:
-        vec = self.embedder.embed_query(query)
-        hits = self.client.query_points(
-            collection_name=self.collection_name,
-            query=vec,
-            limit=top_k,
-            score_threshold=0.3,
-        )
+        if self.langfuse:
+            with self.langfuse.start_as_current_observation(
+                as_type="retriever",
+                name="vector_retriever",
+                input={"query": query, "top_k": top_k},
+            ) as retriever_span:
+                retriever_span.update_trace(name="movie_agent_pipeline")
+                vec = self.embedder.embed_query(query)
+                hits = self.client.query_points(
+                    collection_name=self.collection_name,
+                    query=vec,
+                    limit=top_k,
+                    score_threshold=0.3,
+                )
+                retriever_span.update(output={"hits": len(hits.points)})
+        else:
+            vec = self.embedder.embed_query(query)
+            hits = self.client.query_points(
+                collection_name=self.collection_name,
+                query=vec,
+                limit=top_k,
+                score_threshold=0.3,
+            )
 
         docs: List[Dict[str, Any]] = []
         for point in hits.points:
