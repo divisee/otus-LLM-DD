@@ -264,7 +264,6 @@ Langfuse поддерживает два основных подхода к ло
 
 ![Детальные трейсы с стоимостью](./screenshots/traces_with_cost_langfuse.png)
 
-![Полный пайплайн](./screenshots/detailed_traces_langfuse.png)
 
 #### Единый трейс пайплайна со всеми операциями
 
