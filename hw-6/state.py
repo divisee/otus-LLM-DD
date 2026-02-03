@@ -30,5 +30,4 @@ class User_State(TypedDict, total=False):
     refine_query: Optional[str]
 
     itinerary: Dict[str, Any]
-    assumptions: List[str]
     answers: List[str]

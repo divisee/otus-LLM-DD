@@ -18,7 +18,6 @@ class ReviewAgent:
         debug = state.get("debug_notes", [])
         user_request = state.get("user_request", "")
         itinerary = state.get("itinerary", {})
-        assumptions = state.get("assumptions", [])
         refine_iterations = state.get("refine_iterations", 0)
 
         max_iterations = self.config.get("agent", {}).get("max_refine_iterations", 3)
@@ -37,7 +36,7 @@ class ReviewAgent:
                 react_resp = self.llm.invoke([
                     SystemMessage(content=REVIEW_PROMPT),
                     HumanMessage(content=f"Запрос пользователя:\n{user_request}"),
-                    HumanMessage(content=f"Текущий JSON-ответ:\n{json.dumps({'itinerary': itinerary, 'assumptions': assumptions}, ensure_ascii=False)}"),
+                    HumanMessage(content=f"Текущий JSON-ответ:\n{json.dumps({'itinerary': itinerary}, ensure_ascii=False)}"),
                 ])
                 latency = time.time() - start_time
 
@@ -45,7 +44,7 @@ class ReviewAgent:
                     as_type="generation",
                     name="reviewer_llm",
                     model=self.llm.model_name,
-                    input=f"System: {REVIEW_PROMPT}\nUser: Запрос пользователя:\n{user_request}\nТекущий JSON-ответ:\n{json.dumps({'itinerary': itinerary, 'assumptions': assumptions}, ensure_ascii=False)}",
+                    input=f"System: {REVIEW_PROMPT}\nUser: Запрос пользователя:\n{user_request}\nТекущий JSON-ответ:\n{json.dumps({'itinerary': itinerary}, ensure_ascii=False)}",
                 ) as gen:
                     gen.update(output=react_resp.content, metadata={"latency_s": round(latency, 2)})
 

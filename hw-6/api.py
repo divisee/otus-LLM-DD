@@ -59,7 +59,6 @@ class QueryRequest(BaseModel):
 class QueryResponse(BaseModel):
     answer: str
     sources: list[str]
-    assumptions: list[str]
     debug_notes: list[str]
 
 
@@ -108,7 +107,6 @@ async def query_movies(request: QueryRequest):
         return QueryResponse(
             answer=final_answer or "Не удалось получить ответ",
             sources=result.get("citations", []),
-            assumptions=result.get("assumptions", []),
             debug_notes=result.get("debug_notes", []),
         )
 
@@ -160,7 +158,9 @@ async def chat_completions(request: ChatRequest):
     result = await query_movies(QueryRequest(query=query))
 
     # Формируем ответ в формате OpenAI
-    response_text = result.answer
+    response_text = "**Ответ**\n\n" + result.answer
+    if result.sources:
+        response_text += "\n\n**Источники**\n" + "\n".join(f"- {s}" for s in result.sources)
 
     return ChatResponse(
         id="chatcmpl-movie-agent",

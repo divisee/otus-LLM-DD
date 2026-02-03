@@ -68,7 +68,6 @@ class AnswerAgent:
                     data = {
                         "answer": "Не удалось корректно сформировать JSON-ответ.",
                         "sources": citations,
-                        "assumptions": ["Не удалось распарсить JSON от LLM, использован fallback-ответ."],
                     }
                     debug.append("Answerer: invalid JSON, fallback used.")
 
@@ -77,7 +76,6 @@ class AnswerAgent:
             pass
 
         state["itinerary"] = {"answer": data.get("answer", "")}
-        state["assumptions"] = data.get("assumptions", [])
         state["citations"] = data.get("sources", citations)
         state["status"] = "answering"
         state["debug_notes"] = debug

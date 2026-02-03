@@ -120,8 +120,8 @@ class GatherAgent:
                 agent_span.update(
                     output={
                         "rag_docs": rag_docs,
-                        "web_results": len(web_results),
-                        "citations": len(citations),
+                        "web_results": web_results,
+                        "citations": citations,
                     }
                 )
         except Exception:
