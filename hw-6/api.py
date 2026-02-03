@@ -15,6 +15,7 @@ from build_graph import build_graph, make_llm, langfuse
 from state import User_State
 from tools_rag import RagRetriever, make_rag_tool
 from tools_tavily import make_web_search_tool
+from agents.agent_utils import extract_user_from_chat_history
 
 import os
 
@@ -151,14 +152,15 @@ async def chat_completions(request: ChatRequest):
         raise HTTPException(status_code=400, detail="No user message found")
 
     query = user_messages[-1].content
+    extracted = extract_user_from_chat_history(query)
+    if extracted:
+        query = extracted
 
     # Вызываем основной пайплайн
     result = await query_movies(QueryRequest(query=query))
 
     # Формируем ответ в формате OpenAI
     response_text = result.answer
-    if result.sources:
-        response_text += "\n\n**Источники:**\n" + "\n".join(f"- {s}" for s in result.sources)
 
     return ChatResponse(
         id="chatcmpl-movie-agent",

@@ -9,7 +9,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from .prompts import ANALYZER_PROMPT
 
 class AnalyzerAgent:
-    def __init__(self, llm, langfuse=None):
+    def __init__(self, llm, langfuse):
         self.llm = llm
         self.langfuse = langfuse
 
@@ -23,63 +23,12 @@ class AnalyzerAgent:
         need_rag = True
         need_search = True
 
-        if self.langfuse:
-            with self.langfuse.start_as_current_observation(
-                as_type="agent",
-                name="analyzer_agent",
-                input={"user_request": user_request},
-            ) as agent_span:
-                agent_span.update_trace(name="movie_agent_pipeline")
-                start_time = time.time()
-                try:
-                    if user_request:
-                        resp = self.llm.invoke(
-                            [
-                                SystemMessage(content=ANALYZER_PROMPT),
-                                HumanMessage(content=user_request),
-                            ]
-                        )
-
-                        decisions = json.loads(resp.content)
-                        need_rag = bool(decisions.get("need_rag", True))
-                        need_search = bool(decisions.get("need_search", True))
-                        user_request = decisions.get("cleaned_query", user_request)
-                        state["user_request"] = user_request
-                        debug.append(f"Analyzer: cleaned query: '{user_request}'")
-                        debug.append(f"Analyzer: need_rag={need_rag}, need_search={need_search}")
-
-                        with agent_span.start_as_current_observation(
-                            as_type="generation",
-                            name="analyzer_llm",
-                            model=self.llm.model_name,
-                            input=f"System: {ANALYZER_PROMPT}\nUser: {user_request}",
-                        ) as gen:
-                            latency = time.time() - start_time
-                            gen.update(
-                                output=json.dumps(
-                                    {
-                                        "need_rag": need_rag,
-                                        "need_search": need_search,
-                                        "cleaned_query": user_request,
-                                    }
-                                ),
-                                metadata={"latency_s": round(latency, 2)},
-                            )
-
-                except Exception:
-                    request_lower = user_request.lower()
-                    if any(word in request_lower for word in ["посовет", "подборк", "рекоменд", "лучшие"]):
-                        need_rag = False
-                        need_search = True
-                    elif any(word in request_lower for word in ["это фильм", "найди", "что за фильм", "описание"]):
-                        need_rag = True
-                        need_search = False
-                    debug.append("Analyzer: fallback heuristic used.")
-
-                agent_span.update(
-                    output={"need_rag": need_rag, "need_search": need_search, "cleaned_query": user_request}
-                )
-        else:
+        with self.langfuse.start_as_current_observation(
+            as_type="agent",
+            name="analyzer_agent",
+            input={"user_request": user_request},
+        ) as agent_span:
+            agent_span.update_trace(name="movie_agent_pipeline")
             start_time = time.time()
             try:
                 if user_request:
@@ -98,6 +47,24 @@ class AnalyzerAgent:
                     debug.append(f"Analyzer: cleaned query: '{user_request}'")
                     debug.append(f"Analyzer: need_rag={need_rag}, need_search={need_search}")
 
+                    with agent_span.start_as_current_observation(
+                        as_type="generation",
+                        name="analyzer_llm",
+                        model=self.llm.model_name,
+                        input=f"System: {ANALYZER_PROMPT}\nUser: {user_request}",
+                    ) as gen:
+                        latency = time.time() - start_time
+                        gen.update(
+                            output=json.dumps(
+                                {
+                                    "need_rag": need_rag,
+                                    "need_search": need_search,
+                                    "cleaned_query": user_request,
+                                }
+                            ),
+                            metadata={"latency_s": round(latency, 2)},
+                        )
+
             except Exception:
                 request_lower = user_request.lower()
                 if any(word in request_lower for word in ["посовет", "подборк", "рекоменд", "лучшие"]):
@@ -107,6 +74,10 @@ class AnalyzerAgent:
                     need_rag = True
                     need_search = False
                 debug.append("Analyzer: fallback heuristic used.")
+
+            agent_span.update(
+                output={"need_rag": need_rag, "need_search": need_search, "cleaned_query": user_request}
+            )
 
         state["need_rag"] = need_rag
         state["need_search"] = need_search
