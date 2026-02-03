@@ -2,6 +2,7 @@
 
 ## Источник
 - Файл: `hw-6/data/data_films.csv`
+- Kaggle: https://www.kaggle.com/datasets/mostov/movie-and-tv-series-data-from-kinopoisk-and-imdb?resource=download
 - Колонка: `Description Kinopoisk`
 - Всего записей: 477
 
