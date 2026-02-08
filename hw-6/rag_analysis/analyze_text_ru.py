@@ -51,7 +51,7 @@ def _format_stat(value: float, integer: bool = False) -> str:
     return f"{value:.2f}"
 
 
-def build_report(csv_path: Path, column: str, output_path: Path) -> None:
+def build_report(csv_path: Path, column: str) -> None:
     texts, resolved_column, total_rows = _load_text_series(csv_path, column)
     char_len, word_len, empty_count = _series_lengths(texts)
 
@@ -61,38 +61,29 @@ def build_report(csv_path: Path, column: str, output_path: Path) -> None:
 
     empty_share = (empty_count / total_rows) * 100 if total_rows else 0
 
-    report_lines = [
-        "# Анализ длины контекста для RAG",
-        "",
-        "## Источник",
-        f"- Файл: `{csv_path}`",
-        f"- Колонка: `{resolved_column}`",
-        f"- Всего записей: {total_rows}",
-        f"- Пустые значения: {empty_count} ({empty_share:.2f}%)",
-        "",
-        "## Статистика (только непустые значения)",
-        "",
-        "| Метрика | Длина в символах | Длина в словах |",
-        "| --- | --- | --- |",
-        f"| Среднее | {_format_stat(char_stats['mean'])} | {_format_stat(word_stats['mean'])} |",
-        f"| Медиана | {_format_stat(char_stats['median'])} | {_format_stat(word_stats['median'])} |",
-        f"| Стд. отклонение | {_format_stat(char_stats['std'])} | {_format_stat(word_stats['std'])} |",
-        f"| Минимум | {_format_stat(char_stats['min'], integer=True)} | {_format_stat(word_stats['min'], integer=True)} |",
-        f"| P5 | {_format_stat(char_stats['p5'])} | {_format_stat(word_stats['p5'])} |",
-        f"| P25 | {_format_stat(char_stats['p25'])} | {_format_stat(word_stats['p25'])} |",
-        f"| P50 | {_format_stat(char_stats['median'])} | {_format_stat(word_stats['median'])} |",
-        f"| P75 | {_format_stat(char_stats['p75'])} | {_format_stat(word_stats['p75'])} |",
-        f"| P95 | {_format_stat(char_stats['p95'])} | {_format_stat(word_stats['p95'])} |",
-        f"| P99 | {_format_stat(char_stats['p99'])} | {_format_stat(word_stats['p99'])} |",
-        f"| Максимум | {_format_stat(char_stats['max'], integer=True)} | {_format_stat(word_stats['max'], integer=True)} |",
-        "",
-        "## Примечания",
-        "- Статистика рассчитана по непустым значениям, чтобы нули не занижали метрики.",
-        "- Длина в словах рассчитана через разбиение по пробелам.",
-        "",
-    ]
-
-    output_path.write_text("\n".join(report_lines), encoding="utf-8")
+    print("# Анализ длины контекста для RAG")
+    print()
+    print("## Источник")
+    print(f"- Файл: `{csv_path}`")
+    print(f"- Колонка: `{resolved_column}`")
+    print(f"- Всего записей: {total_rows}")
+    print(f"- Пустые значения: {empty_count} ({empty_share:.2f}%)")
+    print()
+    print("## Статистика (только непустые значения)")
+    print()
+    print("| Метрика | Длина в символах | Длина в словах |")
+    print("| --- | --- | --- |")
+    print(f"| Среднее | {_format_stat(char_stats['mean'])} | {_format_stat(word_stats['mean'])} |")
+    print(f"| Медиана | {_format_stat(char_stats['median'])} | {_format_stat(word_stats['median'])} |")
+    print(f"| Стд. отклонение | {_format_stat(char_stats['std'])} | {_format_stat(word_stats['std'])} |")
+    print(f"| Минимум | {_format_stat(char_stats['min'], integer=True)} | {_format_stat(word_stats['min'], integer=True)} |")
+    print(f"| P5 | {_format_stat(char_stats['p5'])} | {_format_stat(word_stats['p5'])} |")
+    print(f"| P25 | {_format_stat(char_stats['p25'])} | {_format_stat(word_stats['p25'])} |")
+    print(f"| P50 | {_format_stat(char_stats['median'])} | {_format_stat(word_stats['median'])} |")
+    print(f"| P75 | {_format_stat(char_stats['p75'])} | {_format_stat(word_stats['p75'])} |")
+    print(f"| P95 | {_format_stat(char_stats['p95'])} | {_format_stat(word_stats['p95'])} |")
+    print(f"| P99 | {_format_stat(char_stats['p99'])} | {_format_stat(word_stats['p99'])} |")
+    print(f"| Максимум | {_format_stat(char_stats['max'], integer=True)} | {_format_stat(word_stats['max'], integer=True)} |")
 
 
 def main() -> None:
@@ -107,14 +98,9 @@ def main() -> None:
         default="text_ru",
         help="Column name with Russian text (default: text_ru).",
     )
-    parser.add_argument(
-        "--output",
-        default="/Users/arasputina/PycharmProjects/otus-LLM-DD/hw-6/rag_analysis/README.md",
-        help="Path to markdown report.",
-    )
     args = parser.parse_args()
 
-    build_report(Path(args.input), args.column, Path(args.output))
+    build_report(Path(args.input), args.column)
 
 
 if __name__ == "__main__":
