@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import requests
 
 HW6_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HW6_ROOT))
@@ -183,23 +184,100 @@ def main():
     logger.info("Running bm25...")
     t0 = time.time()
     bm25_res = []
-    for q in questions:
-        hits = qdr.query_points(
-            collection_name=cfg["qdrant"]["collection_name"],
-            query=models.Document(text=q["question"], model="Qdrant/bm25"),
-            using="bm25",
-            limit=args.top_k
-        )
+
+    # Prepare candidate 'using' names by inspecting collection vectors
+    candidate_names = []
+    try:
+        col_info = qdr.get_collection(cfg["qdrant"]["collection_name"])
+        vc = getattr(col_info, 'vectors_config', None)
+        if isinstance(vc, dict):
+            candidate_names = list(vc.keys())
+        else:
+            # try to introspect via HTTP raw API to get exact JSON structure
+            try:
+                url = cfg['qdrant']['url'].rstrip('/') + f"/collections/{cfg['qdrant']['collection_name']}"
+                r = requests.get(url, timeout=5)
+                if r.ok:
+                    j = r.json()
+                    # Try different paths to find vector names
+                    for key in ['result', 'collection', 'payload', 'vectors_config', 'vectors', 'params']:
+                        part = j.get(key) if isinstance(j, dict) else None
+                        if isinstance(part, dict):
+                            for k in part.keys():
+                                if 'bm25' in k.lower() or 'bm' in k.lower():
+                                    candidate_names.append(k)
+                    # fallback: scan top-level keys
+                    for k in j.keys():
+                        if isinstance(j[k], dict):
+                            for subk in j[k].keys():
+                                if 'bm25' in subk.lower() or 'bm' in subk.lower():
+                                    candidate_names.append(subk)
+            except Exception:
+                pass
+    except Exception:
+        candidate_names = []
+
+    # Add common fallbacks
+    common_fallbacks = ['bm25', 'bm25_vector', 'my-bm25-vector', 'bm25_vec', 'bm25vector']
+    for name in common_fallbacks:
+        if name not in candidate_names:
+            candidate_names.append(name)
+
+    # Always try without 'using' as last resort
+    candidate_names.append(None)
+
+    logger.info(f"BM25 candidate vector names to try: {candidate_names}")
+
+    # Function to try query with various 'using' values
+    def try_query_with_candidates(question_text, top_k):
+        last_exc = None
+        for using_name in candidate_names:
+            try:
+                if using_name:
+                    hits = qdr.query_points(
+                        collection_name=cfg["qdrant"]["collection_name"],
+                        query=models.Document(text=question_text, model="qdrant/bm25"),
+                        using=using_name,
+                        limit=top_k
+                    )
+                else:
+                    # try without 'using' parameter
+                    hits = qdr.query_points(
+                        collection_name=cfg["qdrant"]["collection_name"],
+                        query=models.Document(text=question_text, model="qdrant/bm25"),
+                        limit=top_k
+                    )
+                return hits
+            except Exception as e:
+                last_exc = e
+                msg = str(e).lower()
+                logger.debug(f"BM25 attempt using={using_name} failed: {msg}")
+                # if error mentions vector name, continue to next candidate
+                if 'not existing vector name' in msg or 'wrong input' in msg or 'vector name' in msg:
+                    continue
+                # for other errors, raise immediately
+                raise
+        # if all candidates failed, raise last exception with context
+        if last_exc:
+            logger.error(f"All BM25 using candidates failed. Last error: {last_exc}")
+            raise last_exc
+        return None
+
+    for q_item in questions:
+        hits = try_query_with_candidates(q_item['question'], args.top_k)
         docs = []
+        if hits is None:
+            bm25_res.append([])
+            continue
         for point in hits.points:
             payload = point.payload or {}
             docs.append({
-                "id": point.id,
-                "bm25_score": point.score,
+                'id': point.id,
+                'bm25_score': point.score,
                 **payload
             })
         bm25_res.append(docs)
-    experiments["bm25"] = (bm25_res, (time.time() - t0) * 1000 / len(questions))
+    experiments['bm25'] = (bm25_res, (time.time() - t0) * 1000 / len(questions))
 
     # RRF
     logger.info("Running hybrid_rrf...")

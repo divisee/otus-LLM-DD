@@ -72,6 +72,7 @@ class VectorRetriever:
         ollama_cfg = config["ollama"]
         self.embed_url = f"{ollama_cfg['base_url'].rstrip('/')}/api/embed"
         self.embed_model = ollama_cfg["embedding_model"]
+        self.vector_name = "dense"
 
     def embed(self, text: str) -> list[float]:
         resp = requests.post(self.embed_url, json={"model": self.embed_model, "input": text}, timeout=120)
@@ -84,6 +85,7 @@ class VectorRetriever:
         hits = self.client.query_points(
             collection_name=self.collection_name,
             query=vec,
+            using="dense",
             limit=top_k * 3,  # Get more for deduplication
             score_threshold=0.3,
         )

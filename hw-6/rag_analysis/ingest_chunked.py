@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import requests
 import yaml
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Distance, PointStruct, VectorParams
 
@@ -32,49 +33,17 @@ def normalize_value(value):
 
 
 def recursive_split(text: str, chunk_size: int = 500, overlap: int = 100) -> list[str]:
-    """Recursive text splitter: split by paragraphs, then sentences, then characters."""
-    if len(text) <= chunk_size:
-        return [text] if text.strip() else []
+    """Recursive text splitter using LangChain's RecursiveCharacterTextSplitter."""
+    if not text.strip():
+        return []
 
-    # Try splitting by paragraphs first
-    separators = ["\n\n", "\n", ". ", ", ", " ", ""]
-
-    for sep in separators:
-        if sep and sep in text:
-            parts = text.split(sep)
-            chunks = []
-            current = ""
-
-            for part in parts:
-                candidate = current + (sep if current else "") + part
-                if len(candidate) <= chunk_size:
-                    current = candidate
-                else:
-                    if current:
-                        chunks.append(current)
-                    # Start new chunk with overlap from previous
-                    if chunks and overlap > 0:
-                        # Take last 'overlap' chars from previous chunk
-                        prev = chunks[-1]
-                        overlap_text = prev[-overlap:] if len(prev) > overlap else prev
-                        current = overlap_text + sep + part
-                    else:
-                        current = part
-
-            if current:
-                chunks.append(current)
-
-            if chunks:
-                return chunks
-
-    # Fallback: character-level split
-    chunks = []
-    start = 0
-    while start < len(text):
-        end = start + chunk_size
-        chunks.append(text[start:end])
-        start = end - overlap
-    return chunks
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=overlap,
+        separators=["\n\n", "\n", ". ", " ", ""],
+        length_function=len,
+    )
+    return splitter.split_text(text)
 
 
 def embed_texts(base_url: str, model: str, texts: list[str]) -> list[list[float]]:
@@ -155,11 +124,12 @@ def ingest_chunked(config_path: Path, chunk_size: int, overlap: int, collection_
         client.delete_collection(collection_name)
         print(f"Deleted existing collection '{collection_name}'")
 
+    # Create named dense vector called 'dense' so we can query it explicitly
     client.create_collection(
         collection_name=collection_name,
-        vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
+        vectors_config={"dense": VectorParams(size=vector_size, distance=Distance.COSINE)},
     )
-    print(f"Created collection '{collection_name}'")
+    print(f"Created collection '{collection_name}' with named vector 'dense'")
 
     # Ingest in batches
     batch_size = 32
@@ -176,7 +146,8 @@ def ingest_chunked(config_path: Path, chunk_size: int, overlap: int, collection_
             point_id = start + offset
             payload = {k: v for k, v in chunk.items() if k != "text"}
             payload["chunk_text"] = chunk["text"]  # Store chunk text
-            points.append(PointStruct(id=point_id, vector=embedding, payload=payload))
+            # Upsert with named vector 'dense'
+            points.append(PointStruct(id=point_id, vector={"dense": embedding}, payload=payload))
 
         client.upsert(collection_name=collection_name, points=points)
         print(f"\rProgress: {end}/{total} ({100*end//total}%)", end="", flush=True)
@@ -189,6 +160,7 @@ def ingest_chunked(config_path: Path, chunk_size: int, overlap: int, collection_
 
 
 def main():
+    print("Starting ingest_chunked.py")
     parser = argparse.ArgumentParser(description="Ingest movies with chunking")
     parser.add_argument("--config", type=Path, default=Path(__file__).parent.parent / "config.yaml")
     parser.add_argument("--chunk-size", type=int, default=500)
@@ -206,5 +178,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
