@@ -33,6 +33,15 @@ hw-6/rag_analysis/
     └── vector_chunked/
 ```
 
+## Источник данных
+
+- **Файл**: `hw-6/data/data_films.csv`
+- **Источник**: [Kaggle Dataset](https://www.kaggle.com/datasets/mostov/movie-and-tv-series-data-from-kinopoisk-and-imdb?resource=download)
+- **Корпус**: 477 фильмов (Kinopoisk/IMDb)
+- **Embeddings**: Ollama embeddinggemma
+- **Vector Store**: Qdrant
+
+
 ## Эксперименты
 
 | Метод | Описание | Hit@10 | MRR@10 | Latency |
@@ -128,13 +137,6 @@ DBSF учитывает "уверенность" каждого retriever'а ч�
 
 **Гибридный поиск**: комбинация dense и sparse через RRF/DBSF для лучших результатов.
 
-## Источник данных
-
-- **Файл**: `hw-6/data/data_films.csv`
-- **Источник**: [Kaggle Dataset](https://www.kaggle.com/datasets/mostov/movie-and-tv-series-data-from-kinopoisk-and-imdb?resource=download)
-- **Корпус**: 477 фильмов (Kinopoisk/IMDb)
-- **Embeddings**: Ollama embeddinggemma
-- **Vector Store**: Qdrant
 
 ## Датасет вопросов
 
