@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from .agent_utils import extract_usage
 from .prompts import ANSWER_PROMPT
 
 class AnswerAgent:
@@ -52,7 +53,8 @@ class AnswerAgent:
                     model=self.llm.model_name,
                     input=f"System: {ANSWER_PROMPT}\nUser: Запрос пользователя:\n{user_request}\nЛокальные данные (RAG):\n{rag_text}\nРезультаты веб-поиска (Tavily):\n{web_text}\nДоступные URL-источники:\n{citations}",
                 ) as gen:
-                    gen.update(output=resp.content, metadata={"latency_s": round(latency, 2)})
+                    usage = extract_usage(resp)
+                    gen.update(output=resp.content, usage=usage, metadata={"latency_s": round(latency, 2)})
 
                 try:
                     data = json.loads(resp.content)

@@ -1,6 +1,27 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Dict, Optional
+
+
+def extract_usage(response) -> Optional[Dict[str, Any]]:
+    """
+    Извлекает данные об использовании токенов из ответа LLM.
+    Работает с LangChain OpenAI/Ollama, которые прокидывают usage в response_metadata.
+    """
+    if not hasattr(response, "response_metadata"):
+        return None
+
+    metadata = response.response_metadata or {}
+    token_usage = metadata.get("token_usage") or metadata.get("usage") or {}
+
+    if not token_usage:
+        return None
+
+    return {
+        "input": token_usage.get("prompt_tokens"),
+        "output": token_usage.get("completion_tokens"),
+        "total": token_usage.get("total_tokens"),
+    }
 
 
 def extract_user_from_chat_history(raw: str) -> Optional[str]:

@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from .agent_utils import extract_usage
 from .prompts import REVIEW_PROMPT
 
 class ReviewAgent:
@@ -45,7 +46,8 @@ class ReviewAgent:
                     model=self.llm.model_name,
                     input=f"System: {REVIEW_PROMPT}\nUser: Запрос пользователя:\n{user_request}\nТекущий JSON-ответ:\n{json.dumps({'itinerary': itinerary}, ensure_ascii=False)}",
                 ) as gen:
-                    gen.update(output=react_resp.content, metadata={"latency_s": round(latency, 2)})
+                    usage = extract_usage(react_resp)
+                    gen.update(output=react_resp.content, usage=usage, metadata={"latency_s": round(latency, 2)})
 
                 try:
                     react_data = json.loads(react_resp.content)

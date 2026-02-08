@@ -6,6 +6,7 @@ import json
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from .agent_utils import extract_usage
 from .prompts import GATHER_SEARCH_PROMPT
 
 class GatherAgent:
@@ -44,7 +45,6 @@ class GatherAgent:
                 name="gather_agent",
                 input={"query": effective_query, "need_rag": need_rag, "need_search": need_search},
             ) as agent_span:
-                agent_span.update_trace(name="movie_agent_pipeline")
                 if need_rag:
                     rag_res = self.rag_tool.invoke({"query": effective_query})
                     rag_docs = rag_res.get("results", [])
@@ -94,7 +94,8 @@ class GatherAgent:
                             model=self.llm.model_name,
                             input=f"System: {GATHER_SEARCH_PROMPT}\nUser: Запрос: {effective_query}\nРезультаты:\n{raw_results_text}",
                         ) as gen:
-                            gen.update(output=resp.content, metadata={"latency_s": round(latency, 2)})
+                            usage = extract_usage(resp)
+                            gen.update(output=resp.content, usage=usage, metadata={"latency_s": round(latency, 2)})
 
                         try:
                             web_results = json.loads(resp.content)

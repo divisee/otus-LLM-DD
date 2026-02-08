@@ -6,6 +6,7 @@ from typing import Any, Dict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from .agent_utils import extract_usage
 from .prompts import ANALYZER_PROMPT
 
 class AnalyzerAgent:
@@ -53,6 +54,7 @@ class AnalyzerAgent:
                         input=f"System: {ANALYZER_PROMPT}\nUser: {user_request}",
                     ) as gen:
                         latency = time.time() - start_time
+                        usage = extract_usage(resp)
                         gen.update(
                             output=json.dumps(
                                 {
@@ -61,6 +63,7 @@ class AnalyzerAgent:
                                     "cleaned_query": user_request,
                                 }
                             ),
+                            usage=usage,
                             metadata={"latency_s": round(latency, 2)},
                         )
 
