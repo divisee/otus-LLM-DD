@@ -412,10 +412,10 @@ uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 ### Эксперимент 1: RAG без веб-поиска
 
 Агент использует только локальную базу данных фильмов (RAG) для поиска информации, без обращения к интернету.
-
-![RAG без веб-поиска](./screenshots/openweb_rag.png) 
-
+Пример с результатом RAG:
 ![RAG без веб-поиска-1](./screenshots/openweb_rag1.png) 
+Langfuse:
+![RAG без веб-поиска-1-lang](./screenshots/openweb_rag1_lang.png) 
 
 ### Эксперимент 2: С веб-поиском
 
