@@ -1,0 +1,33 @@
+qdrant:
+  url: "http://host.docker.internal:6333"
+  api_key: ""
+  collection_name: "movies"
+
+ollama:
+  base_url: "http://host.docker.internal:11434"
+  embedding_model: "embeddinggemma"
+
+langfuse:
+  base_url: "http://host.docker.internal:3001"
+  public_key: "your-langfuse-public-key"
+  secret_key: "your-langfuse-secret-key"
+
+tavily:
+  api_key: "your-tavily-api-key"
+
+openai:
+  base_url: "https://api.openai.com/v1"
+  model: "gpt-4o-mini"
+  api_key: "your-openai-api-key"
+
+data:
+  csv_path: "data/data_films.csv"
+  text_column: "Description Kinopoisk"
+
+ingest:
+  batch_size: 64
+  distance: "cosine"
+
+agent:
+  max_refine_iterations: 3
+
