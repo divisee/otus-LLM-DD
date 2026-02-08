@@ -228,6 +228,19 @@ python hw-6/scripts/ingest_movies.py --config hw-6/config.yaml
 - `ANSWER_PROMPT` — инструкции для генерации ответа (включая правило не выдумывать фильмы)
 - `REVIEW_PROMPT` — инструкции для проверки качества ответа и перефразировки запроса
 
+### Pydantic-модели
+
+Для валидации и типизации ответов LLM используются Pydantic-модели с `PydanticOutputParser` от LangChain. Это обеспечивает автоматическую проверку JSON, строгую типизацию и понятные сообщения об ошибках.
+
+| Модель | Где используется | Поля |
+|--------|------------------|------|
+| `AnalyzerOutput` | AnalyzerAgent | `cleaned_query`, `need_rag`, `need_search` |
+| `AnswerOutput` | AnswerAgent | `answer`, `sources` |
+| `ReviewOutput` | ReviewAgent | `refine_needed`, `refine_query` |
+| `WebSearchResult` | GatherAgent | `url`, `title`, `content` |
+
+Все модели определены в файле `agents/schemas.py`.
+
 ### Запуск пайплайна
 
 ```bash
