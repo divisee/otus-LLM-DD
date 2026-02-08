@@ -415,12 +415,15 @@ uvicorn api:app --host 0.0.0.0 --port 8000 --reload
 
 ![RAG без веб-поиска](./screenshots/openweb_rag.png) 
 
+![RAG без веб-поиска-1](./screenshots/openweb_rag1.png) 
+
 ### Эксперимент 2: С веб-поиском
 
 В этом случае агент выполняет поиск в интернете через Tavily для получения актуальной информации.
 
 ![С веб-поиском](./screenshots/openweb_web.png)
 
+![С веб-поиском-1](./screenshots/openweb_web1.png)
 
 ## 8) Оценка результатов в Langfuse
 
