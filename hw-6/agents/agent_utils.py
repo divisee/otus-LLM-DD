@@ -1,6 +1,37 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Type, TypeVar
+
+from langchain_core.output_parsers import PydanticOutputParser
+from pydantic import BaseModel
+
+T = TypeVar("T", bound=BaseModel)
+
+
+def parse_llm_output(content: str, model_class: Type[T]) -> T:
+    """
+    Парсит ответ LLM в Pydantic-модель с использованием PydanticOutputParser.
+
+    Args:
+        content: Строка ответа от LLM (JSON)
+        model_class: Класс Pydantic-модели для валидации
+
+    Returns:
+        Экземпляр Pydantic-модели
+
+    Raises:
+        ValueError: Если не удалось распарсить ответ
+    """
+    parser = PydanticOutputParser(pydantic_object=model_class)
+    return parser.parse(content)
+
+
+def get_format_instructions(model_class: Type[T]) -> str:
+    """
+    Возвращает инструкции по формату для LLM на основе Pydantic-модели.
+    """
+    parser = PydanticOutputParser(pydantic_object=model_class)
+    return parser.get_format_instructions()
 
 
 def extract_usage(response) -> Optional[Dict[str, Any]]:

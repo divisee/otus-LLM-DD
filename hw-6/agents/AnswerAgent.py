@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-import json
 import time
 from typing import Any, Dict
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from pydantic import ValidationError
 
-from .agent_utils import extract_usage
+from .agent_utils import extract_usage, parse_llm_output
 from .prompts import ANSWER_PROMPT
+from .schemas import AnswerOutput
+
 
 class AnswerAgent:
     def __init__(self, llm, langfuse):
@@ -30,6 +32,8 @@ class AnswerAgent:
             url = res.get("url", "")
             web_text_chunks.append(f"TITLE: {title}\nURL: {url}\nCONTENT: {content[:1200]}")
         web_text = "\n\n---\n\n".join(web_text_chunks) or "Веб-результаты отсутствуют."
+
+        data = AnswerOutput(answer="Не удалось получить ответ.", sources=citations)
 
         try:
             with self.langfuse.start_as_current_observation(
@@ -57,30 +61,30 @@ class AnswerAgent:
                     gen.update(output=resp.content, usage=usage, metadata={"latency_s": round(latency, 2)})
 
                 try:
-                    data = json.loads(resp.content)
+                    data = parse_llm_output(resp.content, AnswerOutput)
                     debug.append("Answerer: parsed JSON successfully.")
-                except Exception as e:
+                except (ValidationError, ValueError) as e:
                     with agent_span.start_as_current_observation(
                         as_type="span",
                         name="answerer_json_error",
                         input={"error": str(e)},
                     ) as error_span:
                         error_span.update(output={"raw_content": resp.content[:500]})
-                    data = {
-                        "answer": "Не удалось корректно сформировать JSON-ответ.",
-                        "sources": citations,
-                    }
-                    debug.append("Answerer: invalid JSON, fallback used.")
+                    data = AnswerOutput(
+                        answer="Не удалось корректно сформировать JSON-ответ.",
+                        sources=citations,
+                    )
+                    debug.append(f"Answerer: validation error ({e}), fallback used.")
 
-                agent_span.update(output={"answer_len": len(data.get("answer", ""))})
+                agent_span.update(output={"answer_len": len(data.answer)})
         except Exception:
             pass
 
-        state["itinerary"] = {"answer": data.get("answer", "")}
-        state["citations"] = data.get("sources", citations)
+        state["itinerary"] = {"answer": data.answer}
+        state["citations"] = data.sources
         state["status"] = "answering"
         state["debug_notes"] = debug
 
-        state["answers"] = state.get("answers", []) + [data.get("answer", "")]
+        state["answers"] = state.get("answers", []) + [data.answer]
 
         return state

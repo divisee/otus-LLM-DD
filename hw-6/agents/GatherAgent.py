@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import time
-from typing import Any, Dict
-import json
+from typing import Any, Dict, List
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.output_parsers import PydanticOutputParser
+from pydantic import ValidationError
 
 from .agent_utils import extract_usage
 from .prompts import GATHER_SEARCH_PROMPT
+from .schemas import WebSearchResult
+
 
 class GatherAgent:
     def __init__(self, llm, rag_tool, web_tool, langfuse):
@@ -15,6 +18,19 @@ class GatherAgent:
         self.rag_tool = rag_tool
         self.web_tool = web_tool
         self.langfuse = langfuse
+
+    def _parse_web_results(self, content: str) -> List[Dict[str, Any]]:
+        """Парсит список результатов веб-поиска с валидацией через Pydantic."""
+        import json
+        raw_list = json.loads(content)
+        if not isinstance(raw_list, list):
+            raise ValueError("Expected a list of web results")
+
+        validated = []
+        for item in raw_list:
+            result = WebSearchResult(**item)
+            validated.append(result.model_dump())
+        return validated
 
     def __call__(self, state) -> Dict[str, Any]:
         debug = state.get("debug_notes", [])
@@ -98,10 +114,10 @@ class GatherAgent:
                             gen.update(output=resp.content, usage=usage, metadata={"latency_s": round(latency, 2)})
 
                         try:
-                            web_results = json.loads(resp.content)
+                            web_results = self._parse_web_results(resp.content)
                             debug.append(f"Gather: cleaned web results, got {len(web_results)} items.")
-                        except Exception as e:
-                            debug.append(f"Gather: failed to parse cleaned web results, using raw. Error: {e}")
+                        except (ValidationError, ValueError, Exception) as e:
+                            debug.append(f"Gather: validation error ({e}), using raw results.")
                             web_results = raw_web_results
                     else:
                         web_results = []

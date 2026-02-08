@@ -5,9 +5,12 @@ import time
 from typing import Any, Dict
 
 from langchain_core.messages import HumanMessage, SystemMessage
+from pydantic import ValidationError
 
-from .agent_utils import extract_usage
+from .agent_utils import extract_usage, parse_llm_output
 from .prompts import REVIEW_PROMPT
+from .schemas import ReviewOutput
+
 
 class ReviewAgent:
     def __init__(self, llm, config, langfuse):
@@ -50,18 +53,17 @@ class ReviewAgent:
                     gen.update(output=react_resp.content, usage=usage, metadata={"latency_s": round(latency, 2)})
 
                 try:
-                    react_data = json.loads(react_resp.content)
-                    refine_needed = bool(react_data.get("refine_needed", False))
-                    refine_query_raw = react_data.get("refine_query") or ""
-                    refine_query = refine_query_raw.strip() or None
-                except Exception as e:
+                    react_data = parse_llm_output(react_resp.content, ReviewOutput)
+                    refine_needed = react_data.refine_needed
+                    refine_query = (react_data.refine_query or "").strip() or None
+                except (ValidationError, ValueError) as e:
                     with agent_span.start_as_current_observation(
                         as_type="span",
                         name="reviewer_json_error",
                         input={"error": str(e)},
                     ) as error_span:
                         error_span.update(output={"raw_content": react_resp.content[:500]})
-                    debug.append("Reviewer: failed to parse refine JSON, assuming refine_needed=false.")
+                    debug.append(f"Reviewer: validation error ({e}), assuming refine_needed=false.")
                     refine_needed = False
                     refine_query = None
 
