@@ -31,7 +31,6 @@ class ReviewAgent:
                 name="review_agent",
                 input={"user_request": user_request, "iteration": refine_iterations},
             ) as agent_span:
-                agent_span.update_trace(name="movie_agent_pipeline")
                 start_time = time.time()
                 react_resp = self.llm.invoke([
                     SystemMessage(content=REVIEW_PROMPT),

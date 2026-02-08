@@ -28,7 +28,6 @@ class AnalyzerAgent:
             name="analyzer_agent",
             input={"user_request": user_request},
         ) as agent_span:
-            agent_span.update_trace(name="movie_agent_pipeline")
             start_time = time.time()
             try:
                 if user_request:

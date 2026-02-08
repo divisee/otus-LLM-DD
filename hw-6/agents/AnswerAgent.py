@@ -36,7 +36,6 @@ class AnswerAgent:
                 name="answer_agent",
                 input={"user_request": user_request},
             ) as agent_span:
-                agent_span.update_trace(name="movie_agent_pipeline")
                 start_time = time.time()
                 resp = self.llm.invoke([
                     SystemMessage(content=ANSWER_PROMPT),

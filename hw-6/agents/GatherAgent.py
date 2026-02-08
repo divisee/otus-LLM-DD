@@ -71,7 +71,6 @@ class GatherAgent:
                         name="tavily_search",
                         input={"query": effective_query},
                     ) as tool_span:
-                        tool_span.update_trace(name="movie_agent_pipeline")
                         search_res = self.web_tool.invoke({"query": effective_query})
                         raw_web_results = search_res.get("results", [])
                         tool_span.update(output={"hits": len(raw_web_results)})
