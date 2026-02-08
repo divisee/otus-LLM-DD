@@ -37,10 +37,10 @@ hw-6/rag_analysis/
 
 | Метод | Описание | Hit@10 | MRR@10 | Latency |
 |-------|----------|--------|--------|---------|
-| `vector_rag` | Qdrant cosine similarity | 93% | 0.806 | 172ms |
-| `bm25` | Лексический BM25 | 79% | 0.649 | 4.5ms |
-| `hybrid_rrf` | RRF fusion | 94% | 0.791 | 176ms |
-| `hybrid_dbsf` | **DBSF fusion** | **94%** | **0.816** | 176ms |
+| `vector_rag` | Qdrant cosine similarity | 93% | 0.806 | 308ms |
+| `bm25` | Server-side BM25 (sparse vectors) | 67% | 0.551 | 7.1ms |
+| `hybrid_rrf` | RRF fusion | 95% | 0.751 | 315ms |
+| `hybrid_dbsf` | **DBSF fusion** | **95%** | **0.762** | 315ms |
 | `vector_chunked` | **С чанкингом (500/100)** | **96%** | **0.827** | 177ms |
 
 **Лучший результат**: `vector_chunked` с Hit@10=96% и MRR@10=0.827
@@ -90,6 +90,28 @@ score = 0.5 × norm_vector + 0.5 × norm_bm25
 ```
 
 DBSF учитывает "уверенность" каждого retriever'а через нормализацию скоров.
+
+## Sparse vs Dense Vectors
+
+В системе используются два типа векторов для retrieval:
+
+**Dense Vectors** (плотные векторы):
+- Генерируются локально через Ollama (embeddinggemma)
+- Размерность: 1024
+- Хранятся в Qdrant как `dense` vector
+- Используются для семантического поиска по сходству (cosine similarity)
+- Преимущества: высокая точность для семантических запросов
+- Недостатки: высокая latency при генерации эмбеддингов
+
+**Sparse Vectors** (разреженные векторы):
+- Генерируются server-side в Qdrant с моделью `Qdrant/bm25`
+- Представляют текст как sparse вектор (индексы слов + веса)
+- Хранятся в Qdrant как `bm25` sparse vector
+- Используются для лексического поиска (TF-IDF подобный)
+- Преимущества: быстрая генерация, низкая latency
+- Недостатки: менее точны для семантических запросов
+
+**Гибридный поиск**: комбинация dense и sparse через RRF/DBSF для лучших результатов.
 
 ## Источник данных
 

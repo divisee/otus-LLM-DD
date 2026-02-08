@@ -86,6 +86,7 @@ class RagRetriever:
                 hits = self.client.query_points(
                     collection_name=self.collection_name,
                     query=vec,
+                    using="dense",
                     limit=top_k,
                     score_threshold=0.3,
                 )
@@ -95,6 +96,7 @@ class RagRetriever:
             hits = self.client.query_points(
                 collection_name=self.collection_name,
                 query=vec,
+                using="dense",
                 limit=top_k,
                 score_threshold=0.3,
             )

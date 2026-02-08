@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import requests
 import yaml
-from qdrant_client import QdrantClient
-from qdrant_client.http.models import Distance, PointStruct, VectorParams
+from qdrant_client import QdrantClient, models
+from qdrant_client.http.models import Distance, PointStruct, VectorParams, SparseVectorParams
 
 
 def load_config(path: Path) -> dict:
@@ -98,7 +98,8 @@ def ingest(config_path: Path, limit: int | None) -> None:
         client.delete_collection(collection_name)
     client.create_collection(
         collection_name=collection_name,
-        vectors_config=VectorParams(size=vector_size, distance=distance_map[distance]),
+        vectors_config={"dense": VectorParams(size=vector_size, distance=distance_map[distance])},
+        sparse_vectors_config={"bm25": SparseVectorParams()},
     )
 
     total = len(df)
@@ -111,10 +112,14 @@ def ingest(config_path: Path, limit: int | None) -> None:
         for offset, embedding in enumerate(embeddings):
             row = df.iloc[start + offset]
             payload = build_payload(row)
+            text = f"{payload.get('title','')} {payload.get('text_ru','')}"
             points.append(
                 PointStruct(
                     id=start + offset,
-                    vector=embedding,
+                    vector={
+                        "dense": embedding,
+                        "bm25": models.Document(text=text, model="Qdrant/bm25")
+                    },
                     payload=payload,
                 )
             )

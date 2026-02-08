@@ -49,48 +49,6 @@ def ndcg(expected: str, docs: list[dict], k: int) -> float:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# BM25 Retriever
-# ─────────────────────────────────────────────────────────────────────────────
-
-class BM25:
-    def __init__(self, docs: list[dict], k1=1.5, b=0.75):
-        self.docs = docs
-        self.k1, self.b = k1, b
-        self.tokens = [self._tok(d) for d in docs]
-        self.avgdl = sum(len(t) for t in self.tokens) / max(len(docs), 1)
-        self.df = {}
-        for toks in self.tokens:
-            for t in set(toks):
-                self.df[t] = self.df.get(t, 0) + 1
-        n = len(docs)
-        self.idf = {t: math.log(1 + (n - df + 0.5) / (df + 0.5)) for t, df in self.df.items()}
-
-    def _tok(self, d: dict) -> list[str]:
-        return WORD_RE.findall(f"{d.get('title','')} {d.get('text_ru','')}".lower().replace("ё", "е"))
-
-    def search(self, query: str, top_k: int) -> list[dict]:
-        q_toks = WORD_RE.findall(query.lower().replace("ё", "е"))
-        scores = []
-        for idx, toks in enumerate(self.tokens):
-            if not toks:
-                continue
-            tf = {}
-            for t in toks:
-                tf[t] = tf.get(t, 0) + 1
-            s = 0.0
-            for qt in q_toks:
-                if qt not in self.idf:
-                    continue
-                f = tf.get(qt, 0)
-                if f:
-                    s += self.idf[qt] * f * (self.k1 + 1) / (f + self.k1 * (1 - self.b + self.b * len(toks) / self.avgdl))
-            if s > 0:
-                scores.append((s, idx))
-        scores.sort(reverse=True)
-        return [{**self.docs[i], "bm25_score": s} for s, i in scores[:top_k]]
-
-
-# ─────────────────────────────────────────────────────────────────────────────
 # Fusion
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -197,7 +155,7 @@ def main():
 
     # Load corpus from Qdrant
     cfg = load_config(args.config)
-    from qdrant_client import QdrantClient
+    from qdrant_client import QdrantClient, models
     qdr = QdrantClient(url=cfg["qdrant"]["url"])
     corpus = []
     offset = None
@@ -210,7 +168,6 @@ def main():
 
     # Retrievers
     vec = RagRetriever(args.config)
-    bm25 = BM25(corpus)
     ks = [1, 3, 5, 10]
     ts = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
 
@@ -222,10 +179,26 @@ def main():
     vec_res = [vec.retrieve(q["question"], args.top_k) for q in questions]
     experiments["vector_rag"] = (vec_res, (time.time() - t0) * 1000 / len(questions))
 
-    # BM25
+    # BM25 (server-side)
     logger.info("Running bm25...")
     t0 = time.time()
-    bm25_res = [bm25.search(q["question"], args.top_k) for q in questions]
+    bm25_res = []
+    for q in questions:
+        hits = qdr.query_points(
+            collection_name=cfg["qdrant"]["collection_name"],
+            query=models.Document(text=q["question"], model="Qdrant/bm25"),
+            using="bm25",
+            limit=args.top_k
+        )
+        docs = []
+        for point in hits.points:
+            payload = point.payload or {}
+            docs.append({
+                "id": point.id,
+                "bm25_score": point.score,
+                **payload
+            })
+        bm25_res.append(docs)
     experiments["bm25"] = (bm25_res, (time.time() - t0) * 1000 / len(questions))
 
     # RRF
