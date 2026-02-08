@@ -8,7 +8,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Копирование кода
 COPY *.py ./
+COPY agents/ ./agents/
 COPY data/ ./data/
+COPY .env ./
+COPY config.docker.yaml ./config.yaml
 
 # Expose порт
 EXPOSE 8000

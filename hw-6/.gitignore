@@ -1,5 +1,6 @@
 # Config file with API keys - DO NOT COMMIT!
 config.yaml
+config.docker.yaml
 .env
 
 # Python
