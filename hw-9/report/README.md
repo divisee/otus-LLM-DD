@@ -226,13 +226,77 @@ print(result.value)  # 1.0
 
 ### Файл: `.github/workflows/hw9_ragas_tests.yml`
 
-### Триггеры
+```yaml
+name: "HW-9: RAGAS Quality Tests"    # Название workflow (видно во вкладке Actions)
 
-- Push в файлы `hw-9/**`
-- Pull Request, затрагивающий `hw-9/**`
-- Ручной запуск (workflow_dispatch)
+on:                                   # Триггеры запуска:
+  push:
+    paths: ["hw-9/**"]                #   — push в файлы hw-9/
+  pull_request:
+    paths: ["hw-9/**"]                #   — PR с изменениями в hw-9/
+  workflow_dispatch:                   #   — ручной запуск через UI GitHub
 
-### Jobs
+jobs:
+  ragas-tests:
+    runs-on: ubuntu-latest            # Виртуальная машина Ubuntu в облаке GitHub
+    timeout-minutes: 15               # Таймаут — если тесты зависнут, job упадёт через 15 мин
+
+    defaults:
+      run:
+        working-directory: hw-9       # Все команды run выполняются из папки hw-9/
+
+    steps:
+      - name: Checkout                # 1. Клонирование репозитория
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12      # 2. Установка Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip               # 3. Кэширование pip-пакетов (ускоряет повторные запуски)
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('hw-9/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies    # 4. Установка зависимостей
+        run: pip install -r requirements.txt
+
+      - name: Run RAGAS & LLM Judge tests  # 5. Запуск тестов
+        env:                          # Переменные окружения (секрет + модели)
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-4o-mini
+          OPENAI_EMBED_MODEL: text-embedding-3-small
+        run: pytest tests/ -v --tb=short -s
+
+      - name: Upload results          # 6. Загрузка артефактов (даже если тесты упали)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hw9-test-results
+          path: hw-9/results/
+          if-no-files-found: ignore
+```
+
+### Разбор по шагам
+
+| # | Step | Что делает | Зачем |
+|---|------|-----------|-------|
+| 1 | **Checkout** | `git clone` репозитория | Получить код на runner |
+| 2 | **Setup Python** | Устанавливает Python 3.12 | Окружение для запуска тестов |
+| 3 | **Cache pip** | Сохраняет/восстанавливает `~/.cache/pip` | Ускоряет `pip install` при повторных запусках (если `requirements.txt` не менялся) |
+| 4 | **Install dependencies** | `pip install -r requirements.txt` | Устанавливает ragas, openai, pytest и т.д. |
+| 5 | **Run tests** | `pytest tests/ -v --tb=short -s` | Запускает все тесты; `-v` — подробный вывод, `-s` — показывать print, `--tb=short` — короткие трейсбеки |
+| 6 | **Upload results** | Загружает `results/` как артефакт | Можно скачать JSON с метриками после прогона; `if: always()` — загружает даже если тесты упали |
+
+**Ключевые моменты:**
+- `${{ secrets.OPENAI_API_KEY }}` — GitHub подставляет секрет из Settings, в логах он маскируется как `***`
+- `timeout-minutes: 15` — защита от зависания (RAGAS-оценка 10 примеров занимает ~7 мин)
+- `if: always()` на Upload — артефакты сохраняются даже при FAIL, чтобы можно было проанализировать, какие метрики упали
+
+### Jobs (обзор)
 
 ```
 ragas-tests (ubuntu-latest, Python 3.12)
