@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 from openai import OpenAI
+from pydantic import BaseModel
 
 JUDGE_MODEL = "gpt-4o-mini"
 LLM_JUDGE_PASS_RATE = 0.7
@@ -24,11 +25,15 @@ PROJECT_DIR = Path(__file__).parent.parent
 RESULTS_DIR = PROJECT_DIR / "results"
 LOGS_DIR = PROJECT_DIR / "logs"
 
+class JudgeVerdict(BaseModel):
+    """Структурированный ответ LLM-судьи."""
+    correct: bool
+    explanation: str
+
+
 JUDGE_SYSTEM = (
     "Ты — строгий судья качества ответов системы поиска фильмов. "
-    "Оцени, правильно ли система определила фильм. "
-    "Верни ТОЛЬКО JSON с полями: "
-    '"correct" (true/false) и "explanation" (краткое обоснование до 30 слов).'
+    "Оцени, правильно ли система определила фильм."
 )
 
 JUDGE_USER = (
@@ -94,21 +99,21 @@ def judge_results(rag_results):
         )
         log.log(f"  Calling LLM judge ...", end="")
 
-        resp = client.chat.completions.create(
+        resp = client.beta.chat.completions.parse(
             model=JUDGE_MODEL,
             messages=[
                 {"role": "system", "content": JUDGE_SYSTEM},
                 {"role": "user", "content": user_msg},
             ],
             temperature=0,
-            response_format={"type": "json_object"},
+            response_format=JudgeVerdict,
             max_tokens=200,
         )
-        raw = resp.choices[0].message.content or "{}"
-        try:
-            judgement = json.loads(raw)
-        except json.JSONDecodeError:
-            judgement = {"correct": False, "explanation": "JSON parse error"}
+        parsed = resp.choices[0].message.parsed
+        if parsed is not None:
+            judgement = parsed.model_dump()
+        else:
+            judgement = {"correct": False, "explanation": "Parse error"}
 
         elapsed = time.time() - step_t0
         verdict = "CORRECT" if judgement.get("correct") else "WRONG"

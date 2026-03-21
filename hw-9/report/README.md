@@ -193,7 +193,6 @@ print(result.value)  # 1.0
 ```
 Ты — строгий судья качества ответов системы поиска фильмов.
 Оцени, правильно ли система определила фильм.
-Верни ТОЛЬКО JSON с полями: "correct" (true/false) и "explanation" (краткое обоснование до 30 слов).
 ```
 
 **User:**
@@ -207,6 +206,27 @@ print(result.value)  # 1.0
   (допускаются небольшие вариации в названии)
 - correct=false если фильм не угадан или назван другой
 ```
+
+### Structured Outputs (Pydantic)
+
+Ответ судьи извлекается не через ручной парсинг JSON, а через **Structured Outputs** OpenAI API с Pydantic-моделью:
+
+```python
+from pydantic import BaseModel
+
+class JudgeVerdict(BaseModel):
+    correct: bool
+    explanation: str
+
+resp = client.beta.chat.completions.parse(
+    model="gpt-4o-mini",
+    messages=[...],
+    response_format=JudgeVerdict,
+)
+verdict = resp.choices[0].message.parsed  # JudgeVerdict(correct=True, explanation="...")
+```
+
+OpenAI гарантирует соответствие схеме — `correct` всегда `bool`, `explanation` всегда `str`, не бывает ошибок парсинга JSON.
 
 **Пример ответа судьи:**
 ```json
