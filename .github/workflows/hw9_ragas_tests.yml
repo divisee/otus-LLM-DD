@@ -1,0 +1,51 @@
+name: "HW-9: RAGAS Quality Tests"
+
+on:
+  push:
+    paths: ["hw-9/**"]
+  pull_request:
+    paths: ["hw-9/**"]
+  workflow_dispatch:
+
+jobs:
+  ragas-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: hw-9
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('hw-9/requirements.txt') }}
+          restore-keys: ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run RAGAS & LLM Judge tests
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: gpt-4o-mini
+          OPENAI_EMBED_MODEL: text-embedding-3-small
+        run: pytest tests/ -v --tb=short -s
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hw9-test-results
+          path: hw-9/results/
+          if-no-files-found: ignore

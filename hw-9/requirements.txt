@@ -1,0 +1,15 @@
+# ===== OpenAI SDK =====
+openai>=1.0.0
+
+# ===== Embeddings & math =====
+numpy>=1.24.0
+
+# ===== RAG evaluation (RAGAS) =====
+ragas>=0.2.0
+instructor>=1.0.0
+
+# ===== Testing =====
+pytest>=7.0.0
+
+# ===== Env =====
+python-dotenv>=1.0.0
